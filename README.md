@@ -1,29 +1,29 @@
-# # 💊 MedScan AI (Frontend)
+# 📱 MedScan AI - Mobile App (Frontend)
 
-Este es el cliente móvil de **MedScan AI**, desarrollado con **React Native** y **Expo**. La aplicación permite a los usuarios interactuar con el sistema de análisis de medicamentos a través de una interfaz intuitiva, consumiendo los servicios de la API REST de Spring Boot.
+Cliente móvil oficial de **MedScan AI** desarrollado con **React Native** y **Expo**. Esta aplicación permite a los usuarios interactuar con el sistema de gestión de medicación de forma intuitiva, utilizando la cámara del dispositivo y recibiendo alertas en tiempo real.
 
----
+## 🚀 Funcionalidades Principales
 
-## 🚀 Tecnologías Utilizadas
+* **📸 Escaneo de Medicamentos:** Interfaz para captura de imágenes y procesamiento de datos mediante la API.
+* **📅 Panel de Control:** Visualización de tratamientos activos y próximos horarios.
+* **⚠️ Alertas de Interacción:** Notificaciones visuales sobre compatibilidad de fármacos.
+* **🍽️ Guía de Toma:** Indicadores sobre la administración en relación con las comidas.
 
-* **Framework:** [React Native](https://reactnative.dev/) con [Expo](https://expo.dev/).
-* **Lenguaje:** JavaScript / TypeScript.
-* **Cliente HTTP:** Axios para el consumo de la API.
-* **Iconos & Estilos:** Expo Symbols y StyleSheet API.
+## 🛠️ Stack Tecnológico
 
----
+* **Framework:** [Expo](https://expo.dev/) (React Native).
+* **Cliente HTTP:** Axios / Fetch API.
+* **Navegación:** React Navigation.
+* **Iconografía:** Expo Symbols.
 
 ## 📋 Requisitos Previos
 
-1.  **Node.js:** Versión 18 o superior.
-2.  **Expo Go:** Instalado en tu dispositivo móvil (disponible en Play Store/App Store).
-3.  **Backend Operativo:** El servidor [MedScan-AI_Backend](https://github.com/tu-usuario/Medscan-AI_Backend) debe estar corriendo en la misma red local.
-
----
+1. **Node.js** v18 o superior.
+2. App **Expo Go** instalada en el dispositivo móvil.
+3. El Backend debe estar corriendo en la misma red local.
 
 ## ⚙️ Configuración e Instalación
 
-1. **Clonar el repositorio:**
+1. **Instalar dependencias:**
    ```bash
-   git clone [https://github.com/tu-usuario/MedScan_Frontend.git](https://github.com/tu-usuario/MedScan_Frontend.git)
-   cd MedScan_Frontend
+   npm install
