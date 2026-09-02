@@ -19,14 +19,3 @@ export interface User {
   name: string;
   email: string;
 }
-
-export type RootStackParamList = {
-  '(tabs)': undefined;
-  '+not-found': undefined;
-};
-
-export type TabParamList = {
-  index: undefined;
-  scan: undefined;
-  treatments: undefined;
-};
