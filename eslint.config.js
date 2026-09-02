@@ -5,4 +5,9 @@ module.exports = [
   {
     ignores: ['dist/', 'node_modules/', '.expo/', 'coverage/'],
   },
+  {
+    rules: {
+      'import/no-named-as-default-member': 'off',
+    },
+  },
 ];
