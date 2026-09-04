@@ -1,4 +1,4 @@
-import { LoginCredentials, LoginErrors, RegisterInput, RegisterErrors } from '@/types/auth';
+import type { LoginCredentials, LoginErrors, RegisterInput, RegisterErrors } from '@/types/auth';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
