@@ -30,7 +30,20 @@
     "plugins": [
       "expo-router",
       "expo-asset",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir a MedScan AI acceder a la cámara para escanear medicamentos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir a MedScan AI acceder a tus fotos para seleccionar una imagen de medicamento.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }
