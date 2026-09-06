@@ -3,6 +3,8 @@ import { apiClient } from './apiClient';
 export interface ScanResult {
   medication: string;
   dosage?: string;
+  frequency?: string;
+  instructions?: string;
   confidence?: number;
 }
 

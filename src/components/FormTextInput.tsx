@@ -6,12 +6,12 @@ interface FormTextInputProps extends TextInputProps {
   error?: string;
 }
 
-export function FormTextInput({ label, error, ...inputProps }: FormTextInputProps) {
+export function FormTextInput({ label, error, style, ...inputProps }: FormTextInputProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        style={[styles.input, error ? styles.inputError : null]}
+        style={[styles.input, error ? styles.inputError : null, style]}
         placeholderTextColor={colors.textSecondary}
         {...inputProps}
       />

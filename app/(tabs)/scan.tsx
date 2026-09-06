@@ -12,20 +12,25 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { CameraCapture } from '@/components/CameraCapture';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { MedicationReviewForm } from '@/components/MedicationReviewForm';
 import { pickImageFromLibrary, requestMediaLibraryPermission } from '@/utils/media';
-import { uploadScanImage, type ScanResult } from '@/services/scanService';
+import { uploadScanImage } from '@/services/scanService';
+import { saveMedicationFromScan } from '@/services/medicationService';
+import { toMedicationDraft, validateMedicationDraft } from '@/utils/medication';
+import type { MedicationDraft, MedicationField } from '@/types/medication';
 import { colors } from '@/theme';
 
-type ScreenState = 'idle' | 'capturing' | 'preview' | 'processing';
+type ScreenState = 'idle' | 'capturing' | 'preview' | 'review' | 'processing';
 
 export default function ScanScreen() {
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [draft, setDraft] = useState<MedicationDraft | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<MedicationField, string>>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function startCapturing(): void {
-    setScanResult(null);
+    setDraft(null);
     setScreenState('capturing');
   }
 
@@ -36,7 +41,7 @@ export default function ScanScreen() {
 
   function retake(): void {
     setPhotoUri(null);
-    setScanResult(null);
+    setDraft(null);
     setScreenState('capturing');
   }
 
@@ -58,22 +63,59 @@ export default function ScanScreen() {
       return;
     }
 
-    setIsProcessing(true);
     setScreenState('processing');
 
     try {
       const result = await uploadScanImage(photoUri);
-      setScanResult(result);
+      setDraft(toMedicationDraft(result));
+      setScreenState('review');
     } catch {
       Alert.alert('Error', 'No se pudo procesar la imagen. Intentá nuevamente.');
+      setScreenState('preview');
+    }
+  }
+
+  function updateDraft(field: MedicationField, value: string): void {
+    setDraft((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  function handleSubmit(): void {
+    if (!draft) {
+      return;
+    }
+
+    const nextErrors = validateMedicationDraft(draft);
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setErrors({});
+    void saveMedication();
+  }
+
+  async function saveMedication(): Promise<void> {
+    if (!draft) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await saveMedicationFromScan(draft, photoUri);
+      Alert.alert('Éxito', 'Medicamento guardado correctamente.');
+      reset();
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar el medicamento. Intentá nuevamente.');
     } finally {
-      setIsProcessing(false);
+      setIsSubmitting(false);
     }
   }
 
   function reset(): void {
     setPhotoUri(null);
-    setScanResult(null);
+    setDraft(null);
+    setErrors({});
+    setIsSubmitting(false);
     setScreenState('idle');
   }
 
@@ -81,7 +123,7 @@ export default function ScanScreen() {
     return <CameraCapture onCapture={handleCaptured} onCancel={reset} />;
   }
 
-  if (screenState === 'processing' || isProcessing) {
+  if (screenState === 'processing') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -95,8 +137,6 @@ export default function ScanScreen() {
       <View style={styles.container}>
         <Image source={{ uri: photoUri }} style={styles.preview} resizeMode="contain" />
 
-        {scanResult ? <ResultBanner result={scanResult} /> : null}
-
         <View style={styles.previewActions}>
           <Pressable style={styles.retakeButton} onPress={retake}>
             <Ionicons name="refresh" size={20} color={colors.background} />
@@ -108,6 +148,22 @@ export default function ScanScreen() {
           </View>
         </View>
       </View>
+    );
+  }
+
+  if (screenState === 'review' && draft) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.reviewContent}>
+        {photoUri ? <Image source={{ uri: photoUri }} style={styles.reviewThumbnail} /> : null}
+
+        <MedicationReviewForm
+          draft={draft}
+          errors={errors}
+          isSubmitting={isSubmitting}
+          onChange={updateDraft}
+          onSubmit={handleSubmit}
+        />
+      </ScrollView>
     );
   }
 
@@ -133,20 +189,6 @@ export default function ScanScreen() {
   );
 }
 
-interface ResultBannerProps {
-  result: ScanResult;
-}
-
-function ResultBanner({ result }: ResultBannerProps) {
-  return (
-    <View style={styles.resultBanner}>
-      <Text style={styles.resultTitle}>Medicamento detectado</Text>
-      <Text style={styles.resultName}>{result.medication}</Text>
-      {result.dosage ? <Text style={styles.resultDosage}>Dosis: {result.dosage}</Text> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -157,6 +199,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+  },
+  reviewContent: {
+    padding: 24,
+  },
+  reviewThumbnail: {
+    width: '100%',
+    height: 160,
+    resizeMode: 'cover',
+    borderRadius: 8,
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
@@ -226,25 +278,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
-  resultBanner: {
-    backgroundColor: '#eaf4fb',
-    padding: 16,
-    marginHorizontal: 16,
-    borderRadius: 8,
-  },
-  resultTitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  resultName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    marginTop: 4,
-  },
-  resultDosage: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    marginTop: 4,
-  },
 });
+
