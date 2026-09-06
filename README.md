@@ -42,6 +42,17 @@ Cliente móvil oficial de **MedScan AI** desarrollado con **React Native** y **E
 
    > Las variables expuestas al cliente de Expo deben tener el prefijo `EXPO_PUBLIC_` para estar disponibles en el bundle. Variables sin este prefijo no aplican al frontend móvil.
 
+## 📡 Contrato de API
+
+La especificación **OpenAPI 3.0** de la REST API de MedScan AI es la **única fuente de verdad** del contrato entre este frontend y `MedScan-AI_Backend`. Contiene endpoints, DTOs de entrada/salida, códigos de error HTTP y autenticación:
+
+* **Especificación canónica:** [`docs/openapi.yaml`](docs/openapi.yaml)
+* **Swagger UI local:** [`docs/swagger.html`](docs/swagger.html)
+
+**Vista previa en Swagger UI** (requiere servir los `docs/` vía HTTP, p. ej. `npx serve docs -l 8080` y abrir `http://localhost:8080/swagger.html`).
+
+El backend publica la misma especificación en su documentación/Swagger UI; cualquier cambio de contrato debe hacerse primero en `docs/openapi.yaml` y reflejarse luego en ambos repositorios.
+
 ## ▶️ Ejecución
 
 Inicia el servidor de desarrollo de Expo:
