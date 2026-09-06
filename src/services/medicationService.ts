@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 import type { MedicationDraft } from '@/types/medication';
-import type { Medication } from '@/types';
+import type { DoseRecord, Medication } from '@/types';
 
 export function listMedications(): Promise<Medication[]> {
   return apiClient.get<Medication[]>('/medications').then((response) => response.data);
@@ -20,6 +20,12 @@ export function updateMedication(id: string, draft: MedicationDraft): Promise<vo
 
 export function deleteMedication(id: string): Promise<void> {
   return apiClient.delete(`/medications/${id}`);
+}
+
+export function markDoseAsTaken(medicationId: string, takenAt: string): Promise<DoseRecord> {
+  return apiClient
+    .post<DoseRecord>(`/medications/${medicationId}/doses`, { takenAt })
+    .then((response) => response.data);
 }
 
 export async function saveMedicationFromScan(

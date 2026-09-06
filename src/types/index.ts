@@ -6,6 +6,12 @@ export interface Medication {
   instructions: string;
 }
 
+export interface DoseRecord {
+  id: string;
+  medicationId: string;
+  takenAt: string;
+}
+
 export interface Treatment {
   id: string;
   medication: Medication;

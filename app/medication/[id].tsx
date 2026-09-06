@@ -11,7 +11,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { MedicationReviewForm } from '@/components/MedicationReviewForm';
+import { ReminderControls } from '@/components/ReminderControls';
 import { getMedication, updateMedication, deleteMedication } from '@/services/medicationService';
+import { cancelMedicationReminders } from '@/services/notificationService';
+import { useMedicationReminder } from '@/hooks/useMedicationReminder';
 import { validateMedicationDraft } from '@/utils/medication';
 import type { Medication } from '@/types';
 import type { MedicationDraft, MedicationField } from '@/types/medication';
@@ -25,6 +28,8 @@ export default function MedicationDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const reminder = useMedicationReminder(medication);
 
   const loadMedication = useCallback(async () => {
     if (!id) {
@@ -102,6 +107,33 @@ export default function MedicationDetailScreen() {
     ]);
   }
 
+  async function handleToggleReminders(enabled: boolean): Promise<void> {
+    const result = await reminder.toggle(enabled);
+    if (result.ok) {
+      return;
+    }
+
+    if (result.reason === 'permission') {
+      Alert.alert(
+        'Permiso requerido',
+        'Necesitás habilitar las notificaciones para recibir recordatorios de toma.',
+      );
+    } else {
+      Alert.alert(
+        'Frecuencia no reconocida',
+        'No pudimos interpretar la frecuencia para programar los recordatorios.',
+      );
+    }
+  }
+
+  async function handleMarkTaken(): Promise<void> {
+    const succeeded = await reminder.markTaken();
+    Alert.alert(
+      succeeded ? 'Éxito' : 'Error',
+      succeeded ? 'Toma registrada.' : 'No se pudo registrar la toma.',
+    );
+  }
+
   async function removeMedication(): Promise<void> {
     if (!id) {
       return;
@@ -109,6 +141,7 @@ export default function MedicationDetailScreen() {
 
     setIsSubmitting(true);
     try {
+      await cancelMedicationReminders(id).catch(() => undefined);
       await deleteMedication(id);
       Alert.alert('Éxito', 'Medicamento eliminado.');
       router.back();
@@ -163,7 +196,22 @@ export default function MedicationDetailScreen() {
         <DetailRow label="Indicaciones" value={medication.instructions} />
       </View>
 
+      <View style={styles.remindersCard}>
+        <ReminderControls
+          isEnabled={reminder.isEnabled}
+          scheduledHours={reminder.scheduledHours}
+          canSchedule={reminder.canSchedule}
+          isToggling={reminder.isToggling}
+          onToggle={(enabled) => void handleToggleReminders(enabled)}
+        />
+      </View>
+
       <View style={styles.actions}>
+        <PrimaryButton
+          title="Marcar como tomada"
+          onPress={() => void handleMarkTaken()}
+          isLoading={reminder.isMarkingTaken}
+        />
         <PrimaryButton title="Editar" onPress={startEditing} />
         <PrimaryButton title="Eliminar" variant="danger" onPress={confirmDelete} />
       </View>
@@ -242,6 +290,9 @@ const styles = StyleSheet.create({
   actions: {
     marginTop: 24,
     gap: 12,
+  },
+  remindersCard: {
+    marginTop: 24,
   },
   cancelContainer: {
     marginTop: 16,
