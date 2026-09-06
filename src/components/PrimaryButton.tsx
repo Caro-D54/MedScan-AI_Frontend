@@ -4,11 +4,25 @@ import { colors } from '@/theme';
 interface PrimaryButtonProps extends PressableProps {
   title: string;
   isLoading?: boolean;
+  variant?: 'primary' | 'danger';
 }
 
-export function PrimaryButton({ title, isLoading = false, ...pressableProps }: PrimaryButtonProps) {
+export function PrimaryButton({
+  title,
+  isLoading = false,
+  variant = 'primary',
+  disabled,
+  ...pressableProps
+}: PrimaryButtonProps) {
+  const backgroundColor = variant === 'danger' ? colors.danger : colors.primary;
+  const isDisabled = isLoading || disabled;
+
   return (
-    <Pressable style={styles.button} disabled={isLoading} {...pressableProps}>
+    <Pressable
+      style={({ pressed }) => [styles.button, { backgroundColor }, pressed && !isDisabled ? styles.pressed : null]}
+      disabled={isDisabled}
+      {...pressableProps}
+    >
       {isLoading ? (
         <ActivityIndicator color={colors.background} />
       ) : (
@@ -20,10 +34,12 @@ export function PrimaryButton({ title, isLoading = false, ...pressableProps }: P
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
+  },
+  pressed: {
+    opacity: 0.8,
   },
   buttonText: {
     color: colors.background,

@@ -10,6 +10,9 @@ interface MedicationReviewFormProps {
   isSubmitting: boolean;
   onChange: (field: MedicationField, value: string) => void;
   onSubmit: () => void;
+  title?: string;
+  subtitle?: string;
+  submitLabel?: string;
 }
 
 export function MedicationReviewForm({
@@ -18,11 +21,14 @@ export function MedicationReviewForm({
   isSubmitting,
   onChange,
   onSubmit,
+  title = 'Revisar Medicamento',
+  subtitle = 'Corregí los datos detectados por la IA antes de guardar.',
+  submitLabel = 'Guardar Medicamento',
 }: MedicationReviewFormProps) {
   return (
     <View>
-      <Text style={styles.title}>Revisar Medicamento</Text>
-      <Text style={styles.subtitle}>Corregí los datos detectados por la IA antes de guardar.</Text>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
       <FormTextInput
         label="Nombre"
@@ -52,7 +58,7 @@ export function MedicationReviewForm({
         style={styles.instructionsInput}
       />
 
-      <PrimaryButton title="Guardar Medicamento" onPress={onSubmit} isLoading={isSubmitting} />
+      <PrimaryButton title={submitLabel} onPress={onSubmit} isLoading={isSubmitting} />
     </View>
   );
 }
