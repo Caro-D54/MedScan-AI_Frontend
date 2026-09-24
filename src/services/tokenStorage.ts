@@ -1,0 +1,26 @@
+import * as SecureStore from 'expo-secure-store';
+
+const TOKEN_KEY = 'auth_token';
+
+function isWeb(): boolean {
+  return typeof window !== 'undefined';
+}
+
+export async function getStoredToken(): Promise<string | null> {
+  if (isWeb()) {
+    return null;
+  }
+  return SecureStore.getItemAsync(TOKEN_KEY);
+}
+
+export async function storeToken(token: string): Promise<void> {
+  if (!isWeb()) {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  }
+}
+
+export async function clearStoredToken(): Promise<void> {
+  if (!isWeb()) {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  }
+}
