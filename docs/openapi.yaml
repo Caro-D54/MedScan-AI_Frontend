@@ -1,0 +1,420 @@
+openapi: 3.0.3
+info:
+  title: MedScan AI REST API
+  version: 1.0.0
+  description: >
+    Contrato oficial de la API REST de MedScan AI. Sirve como única fuente de verdad para la
+    comunicación entre el frontend móvil (MedScan-AI_Frontend) y el backend (MedScan-AI_Backend).
+
+    Todos los endpoints, salvo los de autenticación, requieren el token JWT obtenido en
+    `POST /auth/login` o `POST /auth/register`, enviado como `Authorization: Bearer <token>`.
+
+  termsOfService: https://github.com/medscan-ai/medscan-ai
+  contact:
+    name: Equipo MedScan AI
+    url: https://github.com/medscan-ai
+  license:
+    name: Propietario
+servers:
+  - url: http://localhost:3000/api
+    description: Desarrollo local (backend)
+
+tags:
+  - name: Autenticación
+    description: Registro e inicio de sesión de usuarios.
+  - name: Medicamentos
+    description: CRUD de medicamentos del usuario y registro de tomas.
+  - name: Escáner
+    description: Análisis de imágenes para extraer datos de medicamentos.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión
+      description: Autentica al usuario y devuelve un token JWT más sus datos.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciales válidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar usuario
+      description: Crea una cuenta nueva y devuelve un token JWT más sus datos.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario creado correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /medications:
+    get:
+      tags: [Medicamentos]
+      summary: Listar medicamentos
+      description: Devuelve todos los medicamentos guardados por el usuario autenticado.
+      responses:
+        '200':
+          description: Lista de medicamentos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Medication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Medicamentos]
+      summary: Crear medicamento
+      description: Guarda un nuevo medicamento. Acepta `imageUri` opcional cuando el medicamento
+        proviene de un escaneo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationInput'
+      responses:
+        '201':
+          description: Medicamento creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /medications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/MedicationId'
+    get:
+      tags: [Medicamentos]
+      summary: Obtener medicamento
+      description: Devuelve el medicamento indicado, siempre que pertenezca al usuario actual.
+      responses:
+        '200':
+          description: Medicamento encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Medicamentos]
+      summary: Actualizar medicamento
+      description: Reemplaza los datos de un medicamento existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicationInput'
+      responses:
+        '200':
+          description: Medicamento actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Medication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Medicamentos]
+      summary: Eliminar medicamento
+      description: Elimina el medicamento y cancela sus recordatorios de toma asociados.
+      responses:
+        '204':
+          description: Medicamento eliminado (sin cuerpo).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /medications/{id}/doses:
+    parameters:
+      - $ref: '#/components/parameters/MedicationId'
+    post:
+      tags: [Medicamentos]
+      summary: Registrar toma
+      description: Registra una toma realizada para el medicamento indicado (desde la app o
+        desde la acción de una notificación local).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoseRequest'
+      responses:
+        '201':
+          description: Toma registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /scan:
+    post:
+      tags: [Escáner]
+      summary: Analizar imagen
+      description: Envía una imagen de un medicamento y devuelve los datos detectados por la IA.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Imagen del medicamento (JPEG/PNG).
+      responses:
+        '200':
+          description: Datos detectados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: No se pudo extraer datos de la imagen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido en `/auth/login` o `/auth/register`.
+
+  parameters:
+    MedicationId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del medicamento.
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    User:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 6
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 6
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: Token JWT de acceso.
+        user:
+          $ref: '#/components/schemas/User'
+    Medication:
+      type: object
+      required: [id, name, dosage, frequency, instructions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        dosage:
+          type: string
+        frequency:
+          type: string
+        instructions:
+          type: string
+    MedicationInput:
+      type: object
+      required: [name, dosage, frequency, instructions]
+      properties:
+        name:
+          type: string
+        dosage:
+          type: string
+        frequency:
+          type: string
+          description: Descripción de la frecuencia (p. ej. "Cada 8 horas").
+        instructions:
+          type: string
+        imageUri:
+          type: string
+          description: URI de la imagen del escaneo, se envía solo al crear.
+    DoseRequest:
+      type: object
+      required: [takenAt]
+      properties:
+        takenAt:
+          type: string
+          format: date-time
+          description: Momento en que se realizó la toma (ISO 8601).
+    DoseRecord:
+      type: object
+      required: [id, medicationId, takenAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        medicationId:
+          type: string
+          format: uuid
+        takenAt:
+          type: string
+          format: date-time
+    ScanResult:
+      type: object
+      required: [medication]
+      properties:
+        medication:
+          type: string
+          description: Nombre detectado del medicamento.
+        dosage:
+          type: string
+        frequency:
+          type: string
+        instructions:
+          type: string
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confianza del modelo en 0..1.
+    ErrorResponse:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+          description: Detalles de validación (campo → mensaje).
+
+  responses:
+    BadRequest:
+      description: La petición no pudo validarse (cuerpo o parámetros inválidos).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Token ausente, inválido o expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: El recurso solicitado no existe.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: El recurso ya existe (p. ej., email ya registrado).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: El servicio no está disponible temporalmente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
