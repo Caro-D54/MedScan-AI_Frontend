@@ -2,6 +2,7 @@ import { apiClient, setAuthToken } from './apiClient';
 import { clearStoredToken, storeToken } from './tokenStorage';
 import type { LoginCredentials, RegisterInput } from '@/types/auth';
 import type { User } from '@/types';
+import {getStoredToken} from './tokenStorage';
 
 interface AuthResponse {
   token: string;
@@ -24,6 +25,10 @@ async function authenticate(endpoint: string, credentials: LoginCredentials): Pr
   await storeToken(data.token);
   setAuthToken(data.token);
   return data.user;
+}
+
+export async function getToken(): Promise<string | null> {
+  return getStoredToken();
 }
 
 export function login(credentials: LoginCredentials): Promise<User> {

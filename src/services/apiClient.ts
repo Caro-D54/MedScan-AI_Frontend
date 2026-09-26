@@ -6,7 +6,11 @@ if (!baseURL) {
   throw new Error('EXPO_PUBLIC_API_URL no está definida. Revisá el archivo .env');
 }
 
-export const apiClient = axios.create({ baseURL });
+export const apiClient = axios.create({ 
+  baseURL,
+timeout: 10000,
+headers: { 'Content-Type': 'application/json' },
+});
 
 export function setAuthToken(token: string | null): void {
   if (token) {
