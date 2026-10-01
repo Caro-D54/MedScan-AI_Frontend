@@ -1,12 +1,17 @@
 import { apiClient, setAuthToken } from './apiClient';
-import { clearStoredToken, storeToken } from './tokenStorage';
+import { clearStoredToken, getStoredToken, storeToken } from './tokenStorage';
 import type { LoginCredentials, RegisterInput } from '@/types/auth';
 import type { User } from '@/types';
-import {getStoredToken} from './tokenStorage';
 
-interface AuthResponse {
+export interface RawBackendUser {
+  id: number | string;
+  name: string;
+  email: string;
+}
+
+export interface AuthResponse {
   token: string;
-  user: User;
+  user: RawBackendUser;
 }
 
 interface RegisterPayload {
@@ -15,16 +20,28 @@ interface RegisterPayload {
   password: string;
 }
 
+function normalizeUser(rawUser: RawBackendUser): User {
+  return {
+    ...rawUser,
+    id: String(rawUser.id),
+  };
+}
+
 function toRegisterPayload(input: RegisterInput): RegisterPayload {
   const { confirmPassword, ...payload } = input;
   return payload;
 }
 
-async function authenticate(endpoint: string, credentials: LoginCredentials): Promise<User> {
-  const { data } = await apiClient.post<AuthResponse>(endpoint, credentials);
+async function authenticate(endpoint: string, payload: unknown): Promise<User> {
+  const { data } = await apiClient.post<AuthResponse>(endpoint, payload);
   await storeToken(data.token);
   setAuthToken(data.token);
-  return data.user;
+  return normalizeUser(data.user);
+}
+
+export async function getCurrentUser(): Promise<User> {
+  const { data } = await apiClient.get<RawBackendUser>('/users/me');
+  return normalizeUser(data);
 }
 
 export async function getToken(): Promise<string | null> {
