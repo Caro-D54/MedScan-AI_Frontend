@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { login as loginRequest, register as registerRequest, logout as logoutRequest } from '@/services/authService';
+import {
+  login as loginRequest,
+  register as registerRequest,
+  logout as logoutRequest,
+  getCurrentUser,
+} from '@/services/authService';
 import { getStoredToken } from '@/services/tokenStorage';
 import { setAuthToken } from '@/services/apiClient';
 import type { LoginCredentials, RegisterInput } from '@/types/auth';
@@ -25,13 +30,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = await getStoredToken();
         if (token) {
           setAuthToken(token);
+          const currentUser = await getCurrentUser();
+          setUser(currentUser);
         }
+      } catch {
+        await logoutRequest();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     }
 
-    restoreSession();
+    void restoreSession();
   }, []);
 
   async function signIn(credentials: LoginCredentials): Promise<void> {

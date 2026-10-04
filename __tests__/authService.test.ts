@@ -1,6 +1,12 @@
-import { login, register, getCurrentUser, logout } from '@/services/authService';
 import { apiClient, setAuthToken } from '@/services/apiClient';
-import { storeToken, clearStoredToken } from '@/services/tokenStorage';
+import {
+  login,
+  register,
+  getCurrentUser,
+  logout,
+  getToken,
+} from '@/services/authService';
+import * as tokenStorage from '@/services/tokenStorage';
 
 jest.mock('@/services/apiClient', () => ({
   apiClient: {
@@ -11,94 +17,130 @@ jest.mock('@/services/apiClient', () => ({
 }));
 
 jest.mock('@/services/tokenStorage', () => ({
+  getStoredToken: jest.fn(),
   storeToken: jest.fn(),
   clearStoredToken: jest.fn(),
-  getStoredToken: jest.fn(),
 }));
 
 describe('authService (TDD)', () => {
-  const mockUserFromBackend = {
-    id: 1,
-    name: 'Carolina',
-    email: 'caro@medscan.com',
-  };
-
-  const mockAuthResponse = {
-    token: 'jwt-token-xyz',
-    user: mockUserFromBackend,
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('login', () => {
-    it('authenticates user, stores token, sets header, and returns user with string id', async () => {
-      (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: mockAuthResponse });
+    it('authenticates user, stores token, sets auth header, and returns normalized user', async () => {
+      const mockBackendResponse = {
+        data: {
+          token: 'jwt-login-token-xyz',
+          user: {
+            id: 42,
+            name: 'Carolina Gómez',
+            email: 'caro@medscan.com',
+          },
+        },
+      };
 
-      const credentials = { email: 'caro@medscan.com', password: 'secret123' };
+      (apiClient.post as jest.Mock).mockResolvedValueOnce(mockBackendResponse);
+
+      const credentials = { email: 'caro@medscan.com', password: 'password123' };
       const user = await login(credentials);
 
       expect(apiClient.post).toHaveBeenCalledWith('/auth/login', credentials);
-      expect(storeToken).toHaveBeenCalledWith('jwt-token-xyz');
-      expect(setAuthToken).toHaveBeenCalledWith('jwt-token-xyz');
+      expect(tokenStorage.storeToken).toHaveBeenCalledWith('jwt-login-token-xyz');
+      expect(setAuthToken).toHaveBeenCalledWith('jwt-login-token-xyz');
       expect(user).toEqual({
-        id: '1',
-        name: 'Carolina',
+        id: '42',
+        name: 'Carolina Gómez',
         email: 'caro@medscan.com',
       });
+    });
+
+    it('propagates error when login fails', async () => {
+      (apiClient.post as jest.Mock).mockRejectedValueOnce(new Error('Invalid credentials'));
+
+      await expect(
+        login({ email: 'bad@medscan.com', password: 'wrong' }),
+      ).rejects.toThrow('Invalid credentials');
     });
   });
 
   describe('register', () => {
-    it('strips confirmPassword, registers user, stores token, and returns user', async () => {
-      (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: mockAuthResponse });
+    it('sends sanitized payload without confirmPassword, stores token and returns user', async () => {
+      const mockBackendResponse = {
+        data: {
+          token: 'jwt-register-token-abc',
+          user: {
+            id: 99,
+            name: 'Nuevo Usuario',
+            email: 'nuevo@medscan.com',
+          },
+        },
+      };
+
+      (apiClient.post as jest.Mock).mockResolvedValueOnce(mockBackendResponse);
 
       const registerInput = {
-        name: 'Carolina',
-        email: 'caro@medscan.com',
-        password: 'secret123',
-        confirmPassword: 'secret123',
+        name: 'Nuevo Usuario',
+        email: 'nuevo@medscan.com',
+        password: 'securePass123',
+        confirmPassword: 'securePass123',
       };
 
       const user = await register(registerInput);
 
       expect(apiClient.post).toHaveBeenCalledWith('/auth/register', {
-        name: 'Carolina',
-        email: 'caro@medscan.com',
-        password: 'secret123',
+        name: 'Nuevo Usuario',
+        email: 'nuevo@medscan.com',
+        password: 'securePass123',
       });
-      expect(storeToken).toHaveBeenCalledWith('jwt-token-xyz');
-      expect(setAuthToken).toHaveBeenCalledWith('jwt-token-xyz');
+      expect(tokenStorage.storeToken).toHaveBeenCalledWith('jwt-register-token-abc');
+      expect(setAuthToken).toHaveBeenCalledWith('jwt-register-token-abc');
       expect(user).toEqual({
-        id: '1',
-        name: 'Carolina',
-        email: 'caro@medscan.com',
+        id: '99',
+        name: 'Nuevo Usuario',
+        email: 'nuevo@medscan.com',
       });
     });
   });
 
   describe('getCurrentUser', () => {
-    it('fetches current user profile from /users/me and normalizes id', async () => {
-      (apiClient.get as jest.Mock).mockResolvedValueOnce({ data: mockUserFromBackend });
+    it('fetches current user profile from /users/me and normalizes id to string', async () => {
+      const mockResponse = {
+        data: {
+          id: 7,
+          name: 'Usuario Logueado',
+          email: 'logged@medscan.com',
+        },
+      };
 
-      const profile = await getCurrentUser();
+      (apiClient.get as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const user = await getCurrentUser();
 
       expect(apiClient.get).toHaveBeenCalledWith('/users/me');
-      expect(profile).toEqual({
-        id: '1',
-        name: 'Carolina',
-        email: 'caro@medscan.com',
+      expect(user).toEqual({
+        id: '7',
+        name: 'Usuario Logueado',
+        email: 'logged@medscan.com',
       });
     });
   });
 
-  describe('logout', () => {
-    it('clears stored token and resets auth token header', async () => {
+  describe('logout & getToken', () => {
+    it('clears stored token and resets auth token header on logout', async () => {
       await logout();
 
-      expect(clearStoredToken).toHaveBeenCalledTimes(1);
+      expect(tokenStorage.clearStoredToken).toHaveBeenCalled();
       expect(setAuthToken).toHaveBeenCalledWith(null);
+    });
+
+    it('delegates getToken to tokenStorage', async () => {
+      (tokenStorage.getStoredToken as jest.Mock).mockResolvedValueOnce('persisted-token');
+
+      const token = await getToken();
+
+      expect(tokenStorage.getStoredToken).toHaveBeenCalled();
+      expect(token).toBe('persisted-token');
     });
   });
 });
