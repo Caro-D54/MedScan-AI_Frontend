@@ -7,7 +7,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { EyeIcon, EyeOffIcon, MailIcon, LockIcon, PillIcon } from "../icons/icons";
 import { useAuth } from "../services/AuthContext";

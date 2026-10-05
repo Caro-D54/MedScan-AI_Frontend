@@ -18,6 +18,11 @@ export const colors = {
   border: "rgba(34, 211, 238, 0.1)",
   borderSubtle: "rgba(255, 255, 255, 0.06)",
   white: "#ffffff",
+
+  // Aliases semánticos compatibles con componentes y pantallas existentes
+  background: "#0b1320",
+  primary: "#22d3ee",
+  danger: "#ef4444",
 } as const;
 
 /** Cargar con expo-font: Outfit (títulos) e Inter (cuerpo). */

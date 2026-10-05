@@ -199,7 +199,7 @@ export default function MedicationDetailScreen() {
       <View style={styles.remindersCard}>
         <ReminderControls
           isEnabled={reminder.isEnabled}
-          scheduledHours={reminder.scheduledHours}
+          scheduledHours={reminder.scheduledHours ?? []}
           canSchedule={reminder.canSchedule}
           isToggling={reminder.isToggling}
           onToggle={(enabled) => void handleToggleReminders(enabled)}

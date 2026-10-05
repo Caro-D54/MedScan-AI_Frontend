@@ -62,7 +62,7 @@ export function MedDetailScreen({ med, onBack }: { med: Medication; onBack: () =
             {med.withWater ? (
               <GuideItem icon={<WaterIcon />} title="Vaso lleno de agua" desc="Tragar entero con al menos 200ml de agua." />
             ) : null}
-            <GuideItem icon={<ClockIcon size={14} />} title={med.frequency} desc="Configurá un recordatorio para no perder ninguna toma." />
+            <GuideItem icon={<ClockIcon size={14} />} title={med.frequency ?? "Horario regular"} desc="Configurá un recordatorio para no perder ninguna toma." />
           </View>
         </View>
       </ScrollView>
@@ -79,11 +79,11 @@ export function MedDetailScreen({ med, onBack }: { med: Medication; onBack: () =
   );
 }
 
-function MetaItem({ label, value }: { label: string; value: string }) {
+function MetaItem({ label, value }: { label: string; value?: string }) {
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.metaLabel}>{label.toUpperCase()}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
+      <Text style={styles.metaValue}>{value ?? "—"}</Text>
     </View>
   );
 }
