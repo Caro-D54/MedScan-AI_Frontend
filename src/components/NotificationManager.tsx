@@ -8,7 +8,7 @@ import {
   configureNotifications,
   setupDoseReminderCategory,
 } from '@/services/notificationService';
-import { markDoseAsTaken } from '@/services/medicationService';
+import { markDoseTaken } from '@/services/treatmentService';
 
 const processedResponseIds = new Set<string>();
 
@@ -46,16 +46,24 @@ async function handleResponse(response: NotificationResponse): Promise<void> {
 
   const data = response.notification.request.content.data ?? {};
   const medicationId = typeof data.medicationId === 'string' ? data.medicationId : null;
+  const doseId = typeof data.doseId === 'string' || typeof data.doseId === 'number'
+    ? String(data.doseId)
+    : medicationId;
   const url = typeof data.url === 'string' ? data.url : null;
 
-  if (response.actionIdentifier === MARK_TAKEN_ACTION_IDENTIFIER && medicationId) {
-    const succeeded = await markDoseAsTaken(medicationId, new Date().toISOString());
-    Alert.alert(
-      succeeded ? 'Toma registrada' : 'No se pudo registrar la toma',
-      succeeded
-        ? 'La toma quedó marcada como realizada.'
-        : 'Ocurrió un error. Podés marcarla desde el detalle del medicamento.',
-    );
+  if (response.actionIdentifier === MARK_TAKEN_ACTION_IDENTIFIER && doseId) {
+    try {
+      await markDoseTaken(doseId);
+      Alert.alert(
+        'Toma registrada',
+        'La toma quedó marcada como realizada.',
+      );
+    } catch {
+      Alert.alert(
+        'No se pudo registrar la toma',
+        'Ocurrió un error. Podés marcarla desde el detalle del medicamento.',
+      );
+    }
   }
 
   if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER && url) {

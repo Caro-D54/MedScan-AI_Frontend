@@ -3,12 +3,18 @@ import type { MedicationDraft, MedicationField } from '@/types/medication';
 import type { Medication } from '@/types';
 import { isValidName } from './validation';
 
-export function toMedicationDraft(scanResult: ScanResult): MedicationDraft {
+export function toMedicationDraft(scanResult?: ScanResult | null): MedicationDraft {
+  const resolvedName =
+    scanResult?.brandName ??
+    scanResult?.medication ??
+    scanResult?.name ??
+    scanResult?.activeIngredient ??
+    '';
   return {
-    name: scanResult.medication,
-    dosage: scanResult.dosage ?? '',
-    frequency: scanResult.frequency ?? '',
-    instructions: scanResult.instructions ?? '',
+    name: resolvedName,
+    dosage: scanResult?.dosage ?? '',
+    frequency: scanResult?.frequency ?? '',
+    instructions: scanResult?.instructions ?? '',
   };
 }
 

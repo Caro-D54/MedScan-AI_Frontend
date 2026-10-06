@@ -19,4 +19,5 @@ export interface Medication {
   nextDose?: string;
   status?: string;
   remaining?: number | string;
+  doseId?: string;
 }

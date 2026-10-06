@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
 import { getMedications } from "../services/medicaments";
+import { markDoseTaken } from "../services/treatmentService";
 import type { Medication } from "../services/medicationTypes";
 
 export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medication) => void }) {
   const [meds, setMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isTakingDose, setIsTakingDose] = useState(false);
 
   useEffect(() => {
     getMedications()
@@ -16,6 +18,24 @@ export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medicati
       .catch(() => setErrorMsg("No se pudo conectar con el backend."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleTakeNow(): Promise<void> {
+    const med = meds[0];
+    if (!med) {
+      return;
+    }
+    const targetDoseId = med.doseId ?? med.id;
+    setIsTakingDose(true);
+    try {
+      await markDoseTaken(targetDoseId);
+      Alert.alert("Toma registrada", `Registraste la toma de ${med.name}.`);
+      void getMedications().then(setMeds);
+    } catch {
+      Alert.alert("Error", "No se pudo registrar la toma.");
+    } finally {
+      setIsTakingDose(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -69,9 +89,21 @@ export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medicati
                 </View>
               </View>
             </View>
-            <Pressable style={styles.takeNowButton} accessibilityRole="button" accessibilityLabel="Tomar ahora">
-              <CheckCircleIcon size={13} color={colors.teal} />
-              <Text style={styles.takeNowText}>Tomar ahora</Text>
+            <Pressable
+              style={styles.takeNowButton}
+              accessibilityRole="button"
+              accessibilityLabel="Tomar ahora"
+              onPress={() => void handleTakeNow()}
+              disabled={isTakingDose}
+            >
+              {isTakingDose ? (
+                <ActivityIndicator size="small" color={colors.teal} />
+              ) : (
+                <>
+                  <CheckCircleIcon size={13} color={colors.teal} />
+                  <Text style={styles.takeNowText}>Tomar ahora</Text>
+                </>
+              )}
             </Pressable>
           </View>
         </Section>

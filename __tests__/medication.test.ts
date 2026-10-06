@@ -57,6 +57,51 @@ describe('toMedicationDraft', () => {
       instructions: '',
     });
   });
+
+  it('maps brandName from backend ScannedMedication to the draft name', () => {
+    const backendResult: ScanResult = {
+      brandName: 'Acetaminophen',
+      dosage: '1 tableta cada 8 horas',
+      frequency: 'cada 8 horas',
+    };
+
+    expect(toMedicationDraft(backendResult)).toEqual({
+      name: 'Acetaminophen',
+      dosage: '1 tableta cada 8 horas',
+      frequency: 'cada 8 horas',
+      instructions: '',
+    });
+  });
+
+  it('falls back to activeIngredient if brandName and medication are missing', () => {
+    const backendResult: ScanResult = {
+      activeIngredient: 'Amoxicilina 875 mg',
+      dosage: '1 cada 12 horas',
+      frequency: 'cada 12 horas',
+    };
+
+    expect(toMedicationDraft(backendResult)).toEqual({
+      name: 'Amoxicilina 875 mg',
+      dosage: '1 cada 12 horas',
+      frequency: 'cada 12 horas',
+      instructions: '',
+    });
+  });
+
+  it('safely handles null or undefined scanResult', () => {
+    expect(toMedicationDraft(null)).toEqual({
+      name: '',
+      dosage: '',
+      frequency: '',
+      instructions: '',
+    });
+    expect(toMedicationDraft(undefined)).toEqual({
+      name: '',
+      dosage: '',
+      frequency: '',
+      instructions: '',
+    });
+  });
 });
 
 describe('validateMedicationDraft', () => {

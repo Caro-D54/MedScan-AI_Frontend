@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { markDoseTaken } from './treatmentService';
 import type { MedicationDraft } from '@/types/medication';
 import type { DoseRecord, Medication } from '@/types';
 
@@ -115,10 +116,15 @@ export function deleteMedication(id: string): Promise<void> {
   return apiClient.delete(`/medications/${id}`);
 }
 
-export function markDoseAsTaken(medicationId: string, takenAt: string): Promise<DoseRecord> {
-  return apiClient
-    .post<DoseRecord>(`/medications/${medicationId}/doses`, { takenAt })
-    .then((response) => response.data);
+export function markDoseAsTaken(
+  doseId: string,
+  takenAt: string = new Date().toISOString(),
+): Promise<DoseRecord> {
+  return markDoseTaken(doseId).then((dose) => ({
+    id: String(dose.id),
+    medicationId: doseId,
+    takenAt,
+  }));
 }
 
 export async function saveMedicationFromScan(

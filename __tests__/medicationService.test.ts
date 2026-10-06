@@ -7,6 +7,7 @@ import {
   deleteMedication,
   normalizeMedication,
   toBackendMedicationPayload,
+  markDoseAsTaken,
 } from '@/services/medicationService';
 import type { MedicationDraft } from '@/types/medication';
 
@@ -17,6 +18,10 @@ jest.mock('@/services/apiClient', () => ({
     put: jest.fn(),
     delete: jest.fn(),
   },
+}));
+
+jest.mock('@/services/treatmentService', () => ({
+  markDoseTaken: jest.fn(),
 }));
 
 describe('medicationService (TDD)', () => {
@@ -265,6 +270,22 @@ describe('medicationService (TDD)', () => {
       await deleteMedication('5');
 
       expect(apiClient.delete).toHaveBeenCalledWith('/medications/5');
+    });
+  });
+
+  describe('markDoseAsTaken', () => {
+    it('delegates to treatmentService markDoseTaken and returns DoseRecord', async () => {
+      const { markDoseTaken } = require('@/services/treatmentService');
+      (markDoseTaken as jest.Mock).mockResolvedValueOnce({ id: 101, status: 'TAKEN' });
+
+      const result = await markDoseAsTaken('101', '2026-10-06T15:00:00.000Z');
+
+      expect(markDoseTaken).toHaveBeenCalledWith('101');
+      expect(result).toEqual({
+        id: '101',
+        medicationId: '101',
+        takenAt: '2026-10-06T15:00:00.000Z',
+      });
     });
   });
 });
