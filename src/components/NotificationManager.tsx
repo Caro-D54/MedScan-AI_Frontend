@@ -7,12 +7,26 @@ import {
   MARK_TAKEN_ACTION_IDENTIFIER,
   configureNotifications,
   setupDoseReminderCategory,
+  requestNotificationPermission,
+  registerPushTokenWithBackend,
 } from '@/services/notificationService';
 import { markDoseTaken } from '@/services/treatmentService';
+import { useAuth } from '@/context/AuthContext';
+import type { User } from '@/types';
 
 const processedResponseIds = new Set<string>();
 
+function useOptionalAuth(): User | null {
+  try {
+    const auth = useAuth();
+    return auth.user;
+  } catch {
+    return null;
+  }
+}
+
 export function NotificationManager() {
+  const user = useOptionalAuth();
   const lastResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
@@ -27,6 +41,17 @@ export function NotificationManager() {
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      void (async () => {
+        const granted = await requestNotificationPermission();
+        if (granted) {
+          await registerPushTokenWithBackend();
+        }
+      })();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (lastResponse) {

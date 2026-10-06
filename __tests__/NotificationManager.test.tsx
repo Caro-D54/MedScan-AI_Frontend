@@ -9,7 +9,15 @@ import {
   MARK_TAKEN_ACTION_IDENTIFIER,
   configureNotifications,
   setupDoseReminderCategory,
+  requestNotificationPermission,
+  registerPushTokenWithBackend,
 } from '@/services/notificationService';
+
+const mockUseAuth = jest.fn();
+
+jest.mock('@/context/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
 
 jest.mock('expo-notifications', () => ({
   useLastNotificationResponse: jest.fn(),
@@ -33,11 +41,14 @@ jest.mock('@/services/notificationService', () => ({
   MARK_TAKEN_ACTION_IDENTIFIER: 'mark-taken',
   configureNotifications: jest.fn(),
   setupDoseReminderCategory: jest.fn(),
+  requestNotificationPermission: jest.fn(),
+  registerPushTokenWithBackend: jest.fn(),
 }));
 
 describe('NotificationManager (TDD)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({ user: null });
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
@@ -109,5 +120,44 @@ describe('NotificationManager (TDD)', () => {
     });
 
     expect(router.push).toHaveBeenCalledWith('/medication/5');
+  });
+
+  it('synchronizes push token with backend when user is authenticated and permission is granted', async () => {
+    (Notifications.useLastNotificationResponse as jest.Mock).mockReturnValue(null);
+    mockUseAuth.mockReturnValue({ user: { id: '1', email: 'test@example.com', name: 'Test' } });
+    (requestNotificationPermission as jest.Mock).mockResolvedValueOnce(true);
+    (registerPushTokenWithBackend as jest.Mock).mockResolvedValueOnce('ExponentPushToken[abc]');
+
+    await act(async () => {
+      renderer.create(<NotificationManager />);
+    });
+
+    expect(requestNotificationPermission).toHaveBeenCalled();
+    expect(registerPushTokenWithBackend).toHaveBeenCalled();
+  });
+
+  it('does not register push token when user is authenticated but permission is denied', async () => {
+    (Notifications.useLastNotificationResponse as jest.Mock).mockReturnValue(null);
+    mockUseAuth.mockReturnValue({ user: { id: '1', email: 'test@example.com', name: 'Test' } });
+    (requestNotificationPermission as jest.Mock).mockResolvedValueOnce(false);
+
+    await act(async () => {
+      renderer.create(<NotificationManager />);
+    });
+
+    expect(requestNotificationPermission).toHaveBeenCalled();
+    expect(registerPushTokenWithBackend).not.toHaveBeenCalled();
+  });
+
+  it('does not register push token when user is not authenticated', async () => {
+    (Notifications.useLastNotificationResponse as jest.Mock).mockReturnValue(null);
+    mockUseAuth.mockReturnValue({ user: null });
+
+    await act(async () => {
+      renderer.create(<NotificationManager />);
+    });
+
+    expect(requestNotificationPermission).not.toHaveBeenCalled();
+    expect(registerPushTokenWithBackend).not.toHaveBeenCalled();
   });
 });

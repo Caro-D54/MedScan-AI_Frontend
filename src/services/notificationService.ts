@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { apiClient } from './apiClient';
 import { buildDailyReminderHours, parseFrequencyToHours } from '@/utils/frequency';
 import type { Medication } from '@/types';
 
@@ -17,7 +18,7 @@ interface StoredSchedule {
 type SchedulesByMedication = Record<string, StoredSchedule>;
 
 function isWeb(): boolean {
-  return typeof window !== 'undefined';
+  return Platform.OS === 'web';
 }
 
 export function configureNotifications(): void {
@@ -59,6 +60,35 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
   const requested = await Notifications.requestPermissionsAsync();
   return requested.status === 'granted';
+}
+
+/**
+ * Obtiene el Expo Push Token del dispositivo y lo sincroniza con el backend
+ * mediante PATCH /users/me/push-token con { pushToken: "<token>" }.
+ */
+export async function registerPushTokenWithBackend(): Promise<string | null> {
+  if (isWeb()) {
+    return null;
+  }
+
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== 'granted') {
+      return null;
+    }
+
+    const tokenResponse = await Notifications.getExpoPushTokenAsync();
+    const pushToken = tokenResponse?.data;
+
+    if (!pushToken) {
+      return null;
+    }
+
+    await apiClient.patch('/users/me/push-token', { pushToken });
+    return pushToken;
+  } catch {
+    return null;
+  }
 }
 
 export async function scheduleMedicationReminders(
