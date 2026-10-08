@@ -52,6 +52,7 @@ describe('authService (TDD)', () => {
         id: '42',
         name: 'Carolina Gómez',
         email: 'caro@medscan.com',
+        role: 'USER',
       });
     });
 
@@ -73,6 +74,7 @@ describe('authService (TDD)', () => {
             id: 99,
             name: 'Nuevo Usuario',
             email: 'nuevo@medscan.com',
+            role: 'USER',
           },
         },
       };
@@ -99,6 +101,7 @@ describe('authService (TDD)', () => {
         id: '99',
         name: 'Nuevo Usuario',
         email: 'nuevo@medscan.com',
+        role: 'USER',
       });
     });
   });
@@ -110,6 +113,7 @@ describe('authService (TDD)', () => {
           id: 7,
           name: 'Usuario Logueado',
           email: 'logged@medscan.com',
+          role: 'ADMIN',
         },
       };
 
@@ -122,6 +126,7 @@ describe('authService (TDD)', () => {
         id: '7',
         name: 'Usuario Logueado',
         email: 'logged@medscan.com',
+        role: 'ADMIN',
       });
     });
   });

@@ -28,6 +28,7 @@ describe('AuthContext (TDD)', () => {
       id: '10',
       name: 'Usuario Restaurado',
       email: 'restaurado@medscan.com',
+      role: 'USER',
     });
 
     await act(async () => {
@@ -45,6 +46,7 @@ describe('AuthContext (TDD)', () => {
       id: '10',
       name: 'Usuario Restaurado',
       email: 'restaurado@medscan.com',
+      role: 'USER',
     });
   });
 
@@ -83,7 +85,7 @@ describe('AuthContext (TDD)', () => {
 
   it('updates user state upon successful signIn', async () => {
     (tokenStorage.getStoredToken as jest.Mock).mockResolvedValueOnce(null);
-    const mockUser = { id: '1', name: 'Alex', email: 'alex@medscan.com' };
+    const mockUser = { id: '1', name: 'Alex', email: 'alex@medscan.com', role: 'USER' as const };
     (authService.login as jest.Mock).mockResolvedValueOnce(mockUser);
 
     await act(async () => {

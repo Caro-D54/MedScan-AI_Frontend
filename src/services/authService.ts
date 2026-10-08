@@ -11,6 +11,7 @@ interface BackendUser {
   id: string | number;
   name: string;
   email: string;
+  role?: 'ADMIN' | 'USER';
 }
 
 interface AuthResponse {
@@ -33,6 +34,7 @@ function normalizeUser(rawUser: BackendUser): User {
     id: String(rawUser.id),
     name: rawUser.name,
     email: rawUser.email,
+    role: rawUser.role ?? 'USER',
   };
 }
 
