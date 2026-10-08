@@ -32,14 +32,22 @@ export interface BackendMedicationPayload {
  * Medicament con componentActive/secondaryEffect y IDs numéricos) al modelo frontend Medication.
  */
 export function normalizeMedication(raw?: RawMedicament | null): Medication {
+  const dosage = raw?.dosage ?? raw?.componentActive ?? '';
+  const instructions = raw?.instructions ?? raw?.secondaryEffect ?? '';
   return {
     id: raw?.id != null ? String(raw.id) : '',
     name: raw?.name ?? '',
-    dosage: raw?.dosage ?? raw?.componentActive ?? '',
+    dosage,
+    dose: dosage,
     frequency: raw?.frequency ?? '',
-    instructions: raw?.instructions ?? raw?.secondaryEffect ?? '',
+    instructions,
+    notes: instructions,
+    withFood: raw?.withFood ?? false,
   };
 }
+
+export { getMedications, formatNextDoseTime } from './medicaments';
+
 
 /**
  * Convierte un borrador de la UI a un payload compatible con la entidad Medicament del backend Spring Boot.

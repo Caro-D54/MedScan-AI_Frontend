@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { EyeIcon, EyeOffIcon, MailIcon, LockIcon, PillIcon } from "../icons/icons";
-import { useAuth } from "../services/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export function LoginScreen({ onNavigateRegister }: { onNavigateRegister: () => void }) {
   const { login } = useAuth();

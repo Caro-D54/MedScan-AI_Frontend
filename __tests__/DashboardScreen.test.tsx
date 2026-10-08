@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { getMedications } from '@/services/medicaments';
 import { markDoseTaken } from '@/services/treatmentService';
-import type { Medication } from '@/services/medicationTypes';
+import type { Medication } from '@/types';
 
 jest.mock('@/services/medicaments', () => ({
   getMedications: jest.fn(),
@@ -31,7 +31,10 @@ describe('DashboardScreen (TDD)', () => {
       {
         id: '1',
         name: 'Amoxicilina',
+        dosage: '500 mg',
         dose: '500 mg',
+        frequency: 'cada 8 horas',
+        instructions: 'con comida',
         doseId: '101',
         nextDose: '08:00 hs',
         status: 'verified',
@@ -55,7 +58,10 @@ describe('DashboardScreen (TDD)', () => {
       {
         id: '1',
         name: 'Ibuprofeno',
+        dosage: '400 mg',
         dose: '400 mg',
+        frequency: 'cada 6 horas',
+        instructions: '',
         doseId: '202',
         nextDose: '12:00 hs',
       },

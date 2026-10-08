@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
-import { useAuth } from "../services/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export function ProfileScreen() {
   const { user, logout } = useAuth();

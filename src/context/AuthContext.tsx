@@ -10,12 +10,17 @@ import { setAuthToken } from '@/services/apiClient';
 import type { LoginCredentials, RegisterInput } from '@/types/auth';
 import type { User } from '@/types';
 
-interface AuthContextValue {
+export type FlexibleRegisterInput = Omit<RegisterInput, 'confirmPassword'> & { confirmPassword?: string };
+
+export interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   signIn: (credentials: LoginCredentials) => Promise<void>;
   signUp: (input: RegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
+  login: (credentialsOrEmail: LoginCredentials | string, password?: string) => Promise<void>;
+  register: (input: FlexibleRegisterInput) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -59,8 +64,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  async function login(credentialsOrEmail: LoginCredentials | string, password?: string): Promise<void> {
+    if (typeof credentialsOrEmail === 'string') {
+      await signIn({ email: credentialsOrEmail, password: password ?? '' });
+    } else {
+      await signIn(credentialsOrEmail);
+    }
+  }
+
+  async function register(input: FlexibleRegisterInput): Promise<void> {
+    await signUp({
+      name: input.name,
+      email: input.email,
+      password: input.password,
+      confirmPassword: input.confirmPassword ?? input.password,
+    });
+  }
+
+  const logout = signOut;
+
   const value = useMemo(
-    () => ({ user, isLoading, signIn, signUp, signOut }),
+    () => ({ user, isLoading, signIn, signUp, signOut, login, register, logout }),
     [user, isLoading],
   );
 

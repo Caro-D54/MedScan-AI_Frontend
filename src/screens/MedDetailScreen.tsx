@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BackIcon, ClockIcon, FoodIcon, WarningIcon, WaterIcon } from "../icons/icons";
-import type { Medication } from "../services/medicationTypes";
+import type { Medication } from "@/types";
 
 export function MedDetailScreen({ med, onBack }: { med: Medication; onBack: () => void }) {
   return (

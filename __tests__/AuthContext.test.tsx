@@ -128,4 +128,42 @@ describe('AuthContext (TDD)', () => {
     expect(authService.logout).toHaveBeenCalled();
     expect(capturedContext?.user).toBeNull();
   });
+
+  it('supports unified login and register aliases', async () => {
+    (tokenStorage.getStoredToken as jest.Mock).mockResolvedValueOnce(null);
+    const mockUser = { id: '2', name: 'Laura', email: 'laura@medscan.com', role: 'USER' as const };
+    (authService.login as jest.Mock).mockResolvedValueOnce(mockUser);
+    (authService.register as jest.Mock).mockResolvedValueOnce(mockUser);
+
+    await act(async () => {
+      renderer.create(
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>,
+      );
+    });
+
+    await act(async () => {
+      await capturedContext?.login('laura@medscan.com', 'pass123');
+    });
+    expect(authService.login).toHaveBeenCalledWith({ email: 'laura@medscan.com', password: 'pass123' });
+    expect(capturedContext?.user).toEqual(mockUser);
+
+    await act(async () => {
+      await capturedContext?.register({ name: 'Laura', email: 'laura@medscan.com', password: 'pass' });
+    });
+    expect(authService.register).toHaveBeenCalledWith({
+      name: 'Laura',
+      email: 'laura@medscan.com',
+      password: 'pass',
+      confirmPassword: 'pass',
+    });
+
+    await act(async () => {
+      await capturedContext?.logout();
+    });
+    expect(authService.logout).toHaveBeenCalled();
+    expect(capturedContext?.user).toBeNull();
+  });
 });
+

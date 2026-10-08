@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BackIcon } from "../icons/icons";
-import { useAuth } from "../services/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 type Step = 1 | 2 | 3;
 const CONDITIONS = ["Hipertensión", "Diabetes", "Asma", "Artritis", "Tiroides", "Corazón"];

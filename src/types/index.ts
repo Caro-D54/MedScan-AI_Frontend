@@ -4,7 +4,23 @@ export interface Medication {
   dosage: string;
   frequency: string;
   instructions: string;
+  dose?: string;
+  doseId?: string;
+  nextDose?: string;
+  nextDoseTime?: string;
+  status?: string;
+  type?: string;
+  duration?: string;
+  description?: string;
+  interaction?: string;
+  interactionDetail?: string;
+  withFood?: boolean;
+  withWater?: boolean;
+  avoidAlcohol?: boolean;
+  notes?: string;
+  remaining?: number | string;
 }
+
 
 export interface DoseRecord {
   id: string;

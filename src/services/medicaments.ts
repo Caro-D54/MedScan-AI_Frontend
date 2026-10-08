@@ -1,6 +1,6 @@
 import { listMedications } from './medicationService';
 import { getTreatments, type TreatmentResponse, type DoseResponse } from './treatmentService';
-import type { Medication } from './medicationTypes';
+import type { Medication } from '@/types';
 
 export function formatNextDoseTime(isoString?: string | null): string | undefined {
   if (!isoString) {
@@ -56,11 +56,10 @@ export async function getMedications(): Promise<Medication[]> {
       const pendingDose = pendingDoseByMedId.get(stringId);
 
       return {
+        ...item,
         id: stringId,
-        name: item.name,
-        dose: (item as unknown as { dosage?: string }).dosage ?? '',
-        frequency: item.frequency ?? '',
-        notes: (item as unknown as { instructions?: string }).instructions ?? '',
+        dose: item.dosage,
+        notes: item.instructions ?? '',
         withFood: false,
         doseId: pendingDose ? String(pendingDose.id) : stringId,
         nextDose: pendingDose ? formatNextDoseTime(pendingDose.scheduledAt) : undefined,

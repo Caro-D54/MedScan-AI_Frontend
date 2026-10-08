@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { CheckCircleIcon, SearchIcon } from "../icons/icons";
-import { getMedications } from "../services/medicaments";
-import type { Medication } from "../services/medicationTypes";
+import { getMedications } from "../services/medicationService";
+import type { Medication } from "@/types";
 
 /**
  * Adaptación de diseño (/design-taste-frontend): el original en Figma Make

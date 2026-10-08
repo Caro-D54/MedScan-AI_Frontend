@@ -1,23 +1,56 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
-import { getMedications } from "../services/medicaments";
+import { getMedications } from "../services/medicationService";
 import { markDoseTaken } from "../services/treatmentService";
-import type { Medication } from "../services/medicationTypes";
+import type { Medication } from "@/types";
 
-export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medication) => void }) {
+export interface DashboardScreenProps {
+  onOpenDetail?: (med: Medication) => void;
+  userName?: string;
+}
+
+export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps) {
   const [meds, setMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isTakingDose, setIsTakingDose] = useState(false);
 
+  const displayName = userName?.trim() || "Alex";
+  const initial = displayName.charAt(0).toUpperCase() || "A";
+
+  async function loadMedications(): Promise<void> {
+    try {
+      const data = await getMedications();
+      setMeds(data);
+      setErrorMsg(null);
+    } catch {
+      setErrorMsg("No se pudo conectar con el backend.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
   useEffect(() => {
-    getMedications()
-      .then(setMeds)
-      .catch(() => setErrorMsg("No se pudo conectar con el backend."))
-      .finally(() => setLoading(false));
+    void loadMedications();
   }, []);
+
+  function handleRefresh(): void {
+    setRefreshing(true);
+    void loadMedications();
+  }
 
   async function handleTakeNow(): Promise<void> {
     const med = meds[0];
@@ -46,15 +79,25 @@ export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medicati
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.teal}
+          colors={[colors.teal]}
+        />
+      }
+    >
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>A</Text>
+            <Text style={styles.avatarText}>{initial}</Text>
           </View>
           <View>
             <Text style={styles.brand}>MedScan AI</Text>
-            <Text style={styles.greeting}>Hola, Alex</Text>
+            <Text style={styles.greeting}>{`Hola, ${displayName}`}</Text>
           </View>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Notificaciones" hitSlop={8}>
@@ -112,7 +155,7 @@ export function DashboardScreen({ onOpenDetail }: { onOpenDetail: (med: Medicati
       <Section title="Medicamentos">
         <View style={styles.list}>
           {meds.map((med) => (
-            <MedCard key={med.id} med={med} onPress={() => onOpenDetail(med)} />
+            <MedCard key={med.id} med={med} onPress={() => onOpenDetail?.(med)} />
           ))}
         </View>
       </Section>
