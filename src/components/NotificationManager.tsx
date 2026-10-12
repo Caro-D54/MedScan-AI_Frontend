@@ -70,24 +70,34 @@ async function handleResponse(response: NotificationResponse): Promise<void> {
   processedResponseIds.add(responseId);
 
   const data = response.notification.request.content.data ?? {};
-  const medicationId = typeof data.medicationId === 'string' ? data.medicationId : null;
+  const medicationId = typeof data.medicationId === 'string' || typeof data.medicationId === 'number'
+    ? String(data.medicationId)
+    : null;
   const doseId = typeof data.doseId === 'string' || typeof data.doseId === 'number'
     ? String(data.doseId)
-    : medicationId;
-  const url = typeof data.url === 'string' ? data.url : null;
+    : null;
+  const url = typeof data.url === 'string'
+    ? data.url
+    : medicationId
+      ? `/medication/${medicationId}`
+      : null;
 
-  if (response.actionIdentifier === MARK_TAKEN_ACTION_IDENTIFIER && doseId) {
-    try {
-      await markDoseTaken(doseId);
-      Alert.alert(
-        'Toma registrada',
-        'La toma quedó marcada como realizada.',
-      );
-    } catch {
-      Alert.alert(
-        'No se pudo registrar la toma',
-        'Ocurrió un error. Podés marcarla desde el detalle del medicamento.',
-      );
+  if (response.actionIdentifier === MARK_TAKEN_ACTION_IDENTIFIER) {
+    if (doseId) {
+      try {
+        await markDoseTaken(doseId);
+        Alert.alert(
+          'Toma registrada',
+          'La toma quedó marcada como realizada.',
+        );
+      } catch {
+        Alert.alert(
+          'No se pudo registrar la toma',
+          'Ocurrió un error. Podés marcarla desde el detalle del medicamento.',
+        );
+      }
+    } else if (url) {
+      router.push(url);
     }
   }
 

@@ -98,6 +98,31 @@ describe('NotificationManager (TDD)', () => {
     );
   });
 
+  it('does not call markDoseTaken with medicationId when doseId is missing and navigates to detail instead', async () => {
+    const mockResponse = {
+      actionIdentifier: MARK_TAKEN_ACTION_IDENTIFIER,
+      notification: {
+        request: {
+          identifier: 'unique-response-no-dose-id',
+          content: {
+            data: {
+              medicationId: '5',
+            },
+          },
+        },
+      },
+    };
+
+    (Notifications.useLastNotificationResponse as jest.Mock).mockReturnValue(mockResponse);
+
+    await act(async () => {
+      renderer.create(<NotificationManager />);
+    });
+
+    expect(markDoseTaken).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledWith('/medication/5');
+  });
+
   it('navigates to url when default action identifier is triggered', async () => {
     const mockResponse = {
       actionIdentifier: Notifications.DEFAULT_ACTION_IDENTIFIER,

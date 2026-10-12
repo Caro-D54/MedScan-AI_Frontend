@@ -40,6 +40,8 @@ export async function setupDoseReminderCategory(): Promise<void> {
     return;
   }
 
+  await ensureAndroidChannel();
+
   await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY_ID, [
     {
       identifier: MARK_TAKEN_ACTION_IDENTIFIER,
@@ -117,6 +119,7 @@ export async function scheduleMedicationReminders(
         body: medication.dosage ? `${medication.name} — ${medication.dosage}` : medication.name,
         categoryIdentifier: REMINDER_CATEGORY_ID,
         data: {
+          ...(medication.doseId ? { doseId: medication.doseId } : {}),
           medicationId: medication.id,
           url: `/medication/${medication.id}`,
         },

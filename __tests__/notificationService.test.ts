@@ -5,6 +5,7 @@ import {
   requestNotificationPermission,
   configureNotifications,
   setupDoseReminderCategory,
+  scheduleMedicationReminders,
 } from '@/services/notificationService';
 
 jest.mock('@/services/apiClient', () => ({
@@ -137,6 +138,35 @@ describe('notificationService (TDD)', () => {
       expect(Notifications.setNotificationCategoryAsync).toHaveBeenCalledWith(
         'dose-reminder',
         expect.any(Array),
+      );
+    });
+  });
+
+  describe('scheduleMedicationReminders', () => {
+    it('includes doseId, medicationId, and url in scheduled notification data when doseId is available', async () => {
+      (Notifications.scheduleNotificationAsync as jest.Mock).mockResolvedValue('notif-id-1');
+
+      const result = await scheduleMedicationReminders({
+        id: '15',
+        name: 'Losartán',
+        dosage: '50 mg',
+        frequency: 'cada 12 horas',
+        instructions: 'Tomar con agua',
+        doseId: '88',
+      });
+
+      expect(result).not.toBeNull();
+      expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            categoryIdentifier: 'dose-reminder',
+            data: {
+              doseId: '88',
+              medicationId: '15',
+              url: '/medication/15',
+            },
+          }),
+        }),
       );
     });
   });
