@@ -8,6 +8,7 @@ import {
   normalizeMedication,
   toBackendMedicationPayload,
   markDoseAsTaken,
+  saveMedicationFromScan,
 } from '@/services/medicationService';
 import type { MedicationDraft } from '@/types/medication';
 
@@ -22,6 +23,7 @@ jest.mock('@/services/apiClient', () => ({
 
 jest.mock('@/services/treatmentService', () => ({
   markDoseTaken: jest.fn(),
+  createTreatment: jest.fn(),
 }));
 
 describe('medicationService (TDD)', () => {
@@ -286,6 +288,44 @@ describe('medicationService (TDD)', () => {
         medicationId: '101',
         takenAt: '2026-10-06T15:00:00.000Z',
       });
+    });
+
+    it('rejects when doseId is empty string', async () => {
+      await expect(markDoseAsTaken('')).rejects.toThrow('doseId es requerido');
+    });
+  });
+
+  describe('saveMedicationFromScan', () => {
+    it('creates medication and automatically generates treatment when frequency is valid', async () => {
+      const { createTreatment } = require('@/services/treatmentService');
+      (apiClient.post as jest.Mock).mockResolvedValueOnce({
+        data: {
+          id: 42,
+          name: 'Amoxicilina',
+          dosage: '500mg',
+          frequency: 'cada 8 horas',
+          instructions: 'con comida',
+        },
+      });
+      (createTreatment as jest.Mock).mockResolvedValueOnce({ id: 100 });
+
+      const draft: MedicationDraft = {
+        name: 'Amoxicilina',
+        dosage: '500mg',
+        frequency: 'cada 8 horas',
+        instructions: 'con comida',
+      };
+
+      const result = await saveMedicationFromScan(draft, null);
+
+      expect(result.id).toBe('42');
+      expect(createTreatment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          medicationId: 42,
+          intervalHours: 8,
+          doseQuantity: 1,
+        }),
+      );
     });
   });
 });

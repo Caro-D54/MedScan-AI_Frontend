@@ -1,9 +1,44 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BackIcon, ClockIcon, FoodIcon, WarningIcon, WaterIcon } from "../icons/icons";
+import { createTreatment } from "../services/treatmentService";
+import { parseFrequencyToHours } from "../utils/frequency";
 import type { Medication } from "@/types";
 
 export function MedDetailScreen({ med, onBack }: { med: Medication; onBack: () => void }) {
+  const [isScheduling, setIsScheduling] = useState(false);
+
+  async function handleAddToSchedule(): Promise<void> {
+    if (!med?.id) {
+      return;
+    }
+    const intervalHours = parseFrequencyToHours(med.frequency || "cada 8 horas") ?? 8;
+    setIsScheduling(true);
+    try {
+      const now = new Date();
+      const startDate = now.toISOString().slice(0, 10);
+      const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const startTime = `${hours}:${minutes}:00`;
+
+      await createTreatment({
+        medicationId: Number(med.id),
+        startDate,
+        endDate,
+        intervalHours: Math.max(1, Math.round(intervalHours)),
+        doseQuantity: 1,
+        startTime,
+      });
+      Alert.alert("Tratamiento registrado", "Se generó el horario de tomas para este medicamento.");
+      onBack();
+    } catch {
+      Alert.alert("Error", "No se pudo registrar el horario del tratamiento.");
+    } finally {
+      setIsScheduling(false);
+    }
+  }
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -71,8 +106,18 @@ export function MedDetailScreen({ med, onBack }: { med: Medication; onBack: () =
         <Pressable onPress={onBack} style={styles.secondaryButton} accessibilityRole="button" accessibilityLabel="Descartar">
           <Text style={styles.secondaryButtonText}>Descartar</Text>
         </Pressable>
-        <Pressable style={styles.primaryButton} accessibilityRole="button" accessibilityLabel="Añadir al horario">
-          <Text style={styles.primaryButtonText}>Añadir al horario</Text>
+        <Pressable
+          style={styles.primaryButton}
+          accessibilityRole="button"
+          accessibilityLabel="Añadir al horario"
+          onPress={() => void handleAddToSchedule()}
+          disabled={isScheduling}
+        >
+          {isScheduling ? (
+            <ActivityIndicator size="small" color={colors.bgPrimary} />
+          ) : (
+            <Text style={styles.primaryButtonText}>Añadir al horario</Text>
+          )}
         </Pressable>
       </View>
     </View>

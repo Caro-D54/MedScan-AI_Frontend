@@ -57,10 +57,13 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
     if (!med) {
       return;
     }
-    const targetDoseId = med.doseId ?? med.id;
+    if (!med.doseId) {
+      Alert.alert("Sin dosis pendiente", "No hay una toma programada para este medicamento.");
+      return;
+    }
     setIsTakingDose(true);
     try {
-      await markDoseTaken(targetDoseId);
+      await markDoseTaken(med.doseId);
       Alert.alert("Toma registrada", `Registraste la toma de ${med.name}.`);
       void getMedications().then(setMeds);
     } catch {
@@ -133,11 +136,14 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
               </View>
             </View>
             <Pressable
-              style={styles.takeNowButton}
+              style={[
+                styles.takeNowButton,
+                (!meds[0].doseId || isTakingDose) && styles.takeNowButtonDisabled,
+              ]}
               accessibilityRole="button"
               accessibilityLabel="Tomar ahora"
               onPress={() => void handleTakeNow()}
-              disabled={isTakingDose}
+              disabled={isTakingDose || !meds[0].doseId}
             >
               {isTakingDose ? (
                 <ActivityIndicator size="small" color={colors.teal} />
@@ -254,6 +260,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(34,211,238,0.12)",
     borderWidth: 1,
     borderColor: "rgba(34,211,238,0.2)",
+  },
+  takeNowButtonDisabled: {
+    opacity: 0.4,
   },
   takeNowText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.teal },
   list: { gap: spacing.sm },

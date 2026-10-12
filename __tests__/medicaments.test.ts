@@ -69,7 +69,7 @@ describe('medicaments service (TDD)', () => {
       expect(result[0].nextDose).toBeDefined();
     });
 
-    it('falls back to medication id as doseId when no treatment exists', async () => {
+    it('sets doseId to undefined when no treatment exists', async () => {
       (listMedications as jest.Mock).mockResolvedValueOnce([
         {
           id: '7',
@@ -85,7 +85,7 @@ describe('medicaments service (TDD)', () => {
       const result = await getMedications();
 
       expect(result).toHaveLength(1);
-      expect(result[0].doseId).toBe('7');
+      expect(result[0].doseId).toBeUndefined();
       expect(result[0].nextDose).toBeUndefined();
     });
 

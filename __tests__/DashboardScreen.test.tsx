@@ -87,4 +87,39 @@ describe('DashboardScreen (TDD)', () => {
       'Registraste la toma de Ibuprofeno.',
     );
   });
+
+  it('disables "Tomar ahora" and does not call markDoseTaken when doseId is missing', async () => {
+    const mockMeds: Medication[] = [
+      {
+        id: '1',
+        name: 'Ibuprofeno',
+        dosage: '400 mg',
+        dose: '400 mg',
+        frequency: 'cada 6 horas',
+        instructions: '',
+        doseId: undefined,
+        nextDose: undefined,
+      },
+    ];
+
+    (getMedications as jest.Mock).mockResolvedValue(mockMeds);
+
+    let component!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      component = renderer.create(<DashboardScreen onOpenDetail={onOpenDetail} />);
+    });
+
+    const takeNowButton = component.root.findByProps({ accessibilityLabel: 'Tomar ahora' });
+    expect(takeNowButton.props.disabled).toBe(true);
+
+    await act(async () => {
+      takeNowButton.props.onPress();
+    });
+
+    expect(markDoseTaken).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Sin dosis pendiente',
+      'No hay una toma programada para este medicamento.',
+    );
+  });
 });

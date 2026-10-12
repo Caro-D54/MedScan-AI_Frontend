@@ -60,8 +60,8 @@ export async function getMedications(): Promise<Medication[]> {
         id: stringId,
         dose: item.dosage,
         notes: item.instructions ?? '',
-        withFood: false,
-        doseId: pendingDose ? String(pendingDose.id) : stringId,
+        withFood: item.withFood ?? false,
+        doseId: pendingDose ? String(pendingDose.id) : undefined,
         nextDose: pendingDose ? formatNextDoseTime(pendingDose.scheduledAt) : undefined,
       };
     });

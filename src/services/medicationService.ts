@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient';
-import { markDoseTaken } from './treatmentService';
+import { createTreatment, markDoseTaken } from './treatmentService';
+import { parseFrequencyToHours } from '@/utils/frequency';
 import type { MedicationDraft } from '@/types/medication';
 import type { DoseRecord, Medication } from '@/types';
 
@@ -97,9 +98,11 @@ export function getMedication(id: string): Promise<Medication> {
  */
 export function createMedication(
   draft: MedicationDraft & { imageUri?: string },
-): Promise<void> {
+): Promise<Medication> {
   const payload = toBackendMedicationPayload(draft);
-  return apiClient.post('/medications', payload);
+  return apiClient
+    .post<RawMedicament>('/medications', payload)
+    .then((response) => normalizeMedication(response?.data));
 }
 
 /**
@@ -108,9 +111,11 @@ export function createMedication(
 export function updateMedication(
   id: string,
   draft: MedicationDraft & { imageUri?: string },
-): Promise<void> {
+): Promise<Medication> {
   const payload = toBackendMedicationPayload(draft);
-  return apiClient.put(`/medications/${id}`, payload);
+  return apiClient
+    .put<RawMedicament>(`/medications/${id}`, payload)
+    .then((response) => normalizeMedication(response?.data));
 }
 
 /**
@@ -124,6 +129,9 @@ export function markDoseAsTaken(
   doseId: string,
   takenAt: string = new Date().toISOString(),
 ): Promise<DoseRecord> {
+  if (!doseId) {
+    return Promise.reject(new Error('doseId es requerido para registrar la toma.'));
+  }
   return markDoseTaken(doseId).then((dose) => ({
     id: String(dose.id),
     medicationId: doseId,
@@ -134,7 +142,32 @@ export function markDoseAsTaken(
 export async function saveMedicationFromScan(
   draft: MedicationDraft,
   photoUri: string | null,
-): Promise<void> {
+): Promise<Medication> {
   const payload = photoUri ? { ...draft, imageUri: photoUri } : draft;
-  await createMedication(payload);
+  const created = await createMedication(payload);
+
+  const intervalHours = parseFrequencyToHours(draft.frequency);
+  if (created?.id && intervalHours !== null && intervalHours > 0) {
+    try {
+      const now = new Date();
+      const startDate = now.toISOString().slice(0, 10);
+      const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const startTime = `${hours}:${minutes}:00`;
+
+      await createTreatment({
+        medicationId: Number(created.id),
+        startDate,
+        endDate,
+        intervalHours: Math.max(1, Math.round(intervalHours)),
+        doseQuantity: 1,
+        startTime,
+      });
+    } catch {
+      // Si la creación del tratamiento falla, el medicamento ya fue persistido correctamente
+    }
+  }
+
+  return created;
 }

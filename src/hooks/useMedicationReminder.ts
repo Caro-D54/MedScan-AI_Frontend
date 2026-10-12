@@ -72,19 +72,19 @@ export function useMedicationReminder(medication: Medication | null) {
   );
 
   const markTaken = useCallback(async (): Promise<boolean> => {
-    if (!medication?.id) {
+    if (!medication?.doseId) {
       return false;
     }
     setIsMarkingTaken(true);
     try {
-      await markDoseAsTaken(medication.id, new Date().toISOString());
+      await markDoseAsTaken(medication.doseId, new Date().toISOString());
       return true;
     } catch {
       return false;
     } finally {
       setIsMarkingTaken(false);
     }
-  }, [medication?.id]);
+  }, [medication?.doseId]);
 
   return {
     isEnabled: (scheduledHours?.length ?? 0) > 0,
