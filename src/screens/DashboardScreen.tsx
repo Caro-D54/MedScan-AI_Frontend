@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -30,7 +30,7 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
   const displayName = userName?.trim() || "Alex";
   const initial = displayName.charAt(0).toUpperCase() || "A";
 
-  async function loadMedications(): Promise<void> {
+  const loadMedications = useCallback(async (): Promise<void> => {
     try {
       const data = await getMedications();
       setMeds(data);
@@ -41,18 +41,18 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadMedications();
-  }, []);
+  }, [loadMedications]);
 
-  function handleRefresh(): void {
+  const handleRefresh = useCallback((): void => {
     setRefreshing(true);
     void loadMedications();
-  }
+  }, [loadMedications]);
 
-  async function handleTakeNow(): Promise<void> {
+  const handleTakeNow = useCallback(async (): Promise<void> => {
     const med = meds[0];
     if (!med) {
       return;
@@ -71,7 +71,7 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
     } finally {
       setIsTakingDose(false);
     }
-  }
+  }, [meds]);
 
   if (loading) {
     return (
@@ -169,16 +169,16 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const Section = React.memo(function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
   );
-}
+});
 
-function MedCard({ med, onPress }: { med: Medication; onPress: () => void }) {
+const MedCard = React.memo(function MedCard({ med, onPress }: { med: Medication; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
@@ -197,7 +197,7 @@ function MedCard({ med, onPress }: { med: Medication; onPress: () => void }) {
       {med.description ? <Text style={styles.medCardDesc}>{med.description}</Text> : null}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   loadingRoot: { flex: 1, alignItems: "center", justifyContent: "center" },

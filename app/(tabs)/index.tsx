@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { router } from 'expo-router';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
@@ -5,16 +6,15 @@ import { DashboardScreen } from '@/screens/DashboardScreen';
 import { colors } from '@/theme';
 import type { Medication } from '@/types';
 
-
 export default function HomeScreen() {
   const { user } = useAuth();
 
-  function handleOpenDetail(med: Medication): void {
+  const handleOpenDetail = useCallback((med: Medication): void => {
     router.push({
       pathname: '/medication/[id]',
       params: { id: med.id },
     });
-  }
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
