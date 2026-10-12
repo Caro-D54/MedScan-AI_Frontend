@@ -33,13 +33,17 @@ export interface BackendMedicationPayload {
  * Medicament con componentActive/secondaryEffect y IDs numéricos) al modelo frontend Medication.
  */
 export function normalizeMedication(raw?: RawMedicament | null): Medication {
-  return {
+  const result: Medication = {
     id: raw?.id != null ? String(raw.id) : '',
     name: raw?.name ?? '',
     dosage: raw?.dosage ?? raw?.componentActive ?? '',
     frequency: raw?.frequency ?? '',
     instructions: raw?.instructions ?? raw?.secondaryEffect ?? '',
   };
+  if (raw?.dosage != null && raw?.componentActive != null) {
+    result.activeIngredient = raw.componentActive;
+  }
+  return result;
 }
 
 export { getMedications, formatNextDoseTime } from './medicaments';
@@ -52,10 +56,11 @@ export { getMedications, formatNextDoseTime } from './medicaments';
 export function toBackendMedicationPayload(
   draft: MedicationDraft & { imageUri?: string },
 ): BackendMedicationPayload {
+  const activeIngredient = draft.activeIngredient?.trim();
   return {
     ...draft,
     name: draft.name,
-    componentActive: draft.dosage,
+    componentActive: activeIngredient ? activeIngredient : draft.dosage,
     secondaryEffect: draft.instructions,
     dosage: draft.dosage,
     frequency: draft.frequency,

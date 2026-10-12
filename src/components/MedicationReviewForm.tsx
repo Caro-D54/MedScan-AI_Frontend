@@ -31,28 +31,43 @@ export function MedicationReviewForm({
       <Text style={styles.subtitle}>{subtitle}</Text>
 
       <FormTextInput
-        label="Nombre"
+        label="Nombre comercial"
+        placeholder="Ej. Ibupirac / Tafirol"
         value={draft.name}
         onChangeText={(value) => onChange('name', value)}
         error={errors.name}
       />
 
       <FormTextInput
-        label="Dosis"
-        value={draft.dosage}
-        onChangeText={(value) => onChange('dosage', value)}
+        label="Nombre del principio activo"
+        placeholder="Ej. Ibuprofeno / Paracetamol"
+        value={draft.activeIngredient ?? ''}
+        onChangeText={(value) => onChange('activeIngredient', value)}
+        error={errors.activeIngredient}
       />
 
       <FormTextInput
-        label="Frecuencia"
+        label="Dosis indicada"
+        placeholder="Ej. 400 mg / 1 comprimido"
+        value={draft.dosage}
+        onChangeText={(value) => onChange('dosage', value)}
+        error={errors.dosage}
+      />
+
+      <FormTextInput
+        label="Frecuencia de tomas"
+        placeholder="Ej. cada 8 horas"
         value={draft.frequency}
         onChangeText={(value) => onChange('frequency', value)}
+        error={errors.frequency}
       />
 
       <FormTextInput
         label="Indicaciones"
+        placeholder="Ej. Tomar con comida o abundante agua"
         value={draft.instructions}
         onChangeText={(value) => onChange('instructions', value)}
+        error={errors.instructions}
         multiline
         numberOfLines={4}
         style={styles.instructionsInput}

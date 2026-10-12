@@ -106,6 +106,28 @@ describe('medicationService (TDD)', () => {
         instructions: 'Tomar con abundante agua',
       });
     });
+
+    it('uses activeIngredient as componentActive when explicitly provided in draft', () => {
+      const draft: MedicationDraft = {
+        name: 'Tafirol',
+        activeIngredient: 'Paracetamol',
+        dosage: '500 mg',
+        frequency: 'Cada 8 horas',
+        instructions: 'Tomar con agua',
+      };
+
+      const payload = toBackendMedicationPayload(draft);
+
+      expect(payload).toEqual({
+        name: 'Tafirol',
+        activeIngredient: 'Paracetamol',
+        componentActive: 'Paracetamol',
+        secondaryEffect: 'Tomar con agua',
+        dosage: '500 mg',
+        frequency: 'Cada 8 horas',
+        instructions: 'Tomar con agua',
+      });
+    });
   });
 
   describe('listMedications', () => {

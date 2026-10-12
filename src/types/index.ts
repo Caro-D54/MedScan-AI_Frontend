@@ -1,6 +1,7 @@
 export interface Medication {
   id: string;
   name: string;
+  activeIngredient?: string;
   dosage: string;
   frequency: string;
   instructions: string;

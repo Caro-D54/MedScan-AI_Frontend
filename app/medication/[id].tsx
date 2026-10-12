@@ -191,8 +191,9 @@ export default function MedicationDetailScreen() {
       </View>
 
       <View style={styles.detailCard}>
-        <DetailRow label="Dosis" value={medication.dosage} />
-        <DetailRow label="Frecuencia" value={medication.frequency} />
+        <DetailRow label="Principio activo" value={medication.activeIngredient ?? ''} />
+        <DetailRow label="Dosis indicada" value={medication.dosage} />
+        <DetailRow label="Frecuencia de tomas" value={medication.frequency} />
         <DetailRow label="Indicaciones" value={medication.instructions} />
       </View>
 
@@ -222,6 +223,7 @@ export default function MedicationDetailScreen() {
 function toDraft(medication: Medication): MedicationDraft {
   return {
     name: medication.name,
+    activeIngredient: medication.activeIngredient ?? '',
     dosage: medication.dosage,
     frequency: medication.frequency,
     instructions: medication.instructions,

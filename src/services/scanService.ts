@@ -26,11 +26,18 @@ function inferFileInfo(uri: string): { name: string; type: string } {
 export async function uploadScanImage(uri: string): Promise<ScanResult> {
   const { name, type } = inferFileInfo(uri);
   const formData = new FormData();
-  formData.append('file', {
-    uri,
-    name,
-    type,
-  } as unknown as Blob);
+
+  if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+    const fileResponse = await fetch(uri);
+    const blob = await fileResponse.blob();
+    formData.append('file', blob, name);
+  } else {
+    formData.append('file', {
+      uri,
+      name,
+      type,
+    } as unknown as Blob);
+  }
 
   const response = await apiClient.post<ScanResult>('/scan/process', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

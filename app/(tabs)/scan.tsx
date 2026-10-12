@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraCapture } from '@/components/CameraCapture';
 import { PrimaryButton } from '@/components/PrimaryButton';
@@ -22,26 +23,51 @@ import { colors } from '@/theme';
 
 type ScreenState = 'idle' | 'capturing' | 'preview' | 'review' | 'processing';
 
+const EMPTY_DRAFT: MedicationDraft = {
+  name: '',
+  activeIngredient: '',
+  dosage: '',
+  frequency: '',
+  instructions: '',
+};
+
 export default function ScanScreen() {
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [draft, setDraft] = useState<MedicationDraft | null>(null);
+  const [isManualMode, setIsManualMode] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<MedicationField, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function startCapturing(): void {
     setDraft(null);
+    setIsManualMode(false);
+    setNoticeMessage(null);
     setScreenState('capturing');
+  }
+
+  function startManualEntry(keepPhoto = false): void {
+    if (!keepPhoto) {
+      setPhotoUri(null);
+    }
+    setErrors({});
+    setIsManualMode(true);
+    setNoticeMessage(null);
+    setDraft({ ...EMPTY_DRAFT });
+    setScreenState('review');
   }
 
   function handleCaptured(uri: string): void {
     setPhotoUri(uri);
+    setNoticeMessage(null);
     setScreenState('preview');
   }
 
   function retake(): void {
     setPhotoUri(null);
     setDraft(null);
+    setNoticeMessage(null);
     setScreenState('capturing');
   }
 
@@ -64,14 +90,27 @@ export default function ScanScreen() {
     }
 
     setScreenState('processing');
+    setNoticeMessage(null);
 
     try {
       const result = await uploadScanImage(photoUri);
-      setDraft(toMedicationDraft(result));
+      setIsManualMode(false);
+      setDraft({
+        ...toMedicationDraft(result),
+        activeIngredient: result.activeIngredient ?? '',
+      });
       setScreenState('review');
     } catch {
-      Alert.alert('Error', 'No se pudo procesar la imagen. Intentá nuevamente.');
-      setScreenState('preview');
+      Alert.alert(
+        'Ingreso manual habilitado',
+        'No se pudo analizar la imagen con IA. Podés completar los datos del medicamento manualmente.',
+      );
+      setIsManualMode(true);
+      setNoticeMessage(
+        'No se pudo analizar la imagen con IA automáticamente. Completá los datos del medicamento manualmente a continuación.',
+      );
+      setDraft({ ...EMPTY_DRAFT });
+      setScreenState('review');
     }
   }
 
@@ -104,8 +143,10 @@ export default function ScanScreen() {
       await saveMedicationFromScan(draft, photoUri);
       Alert.alert('Éxito', 'Medicamento guardado correctamente.');
       reset();
+      router.replace('/');
     } catch {
       Alert.alert('Error', 'No se pudo guardar el medicamento. Intentá nuevamente.');
+      setNoticeMessage('No se pudo guardar el medicamento. Verificá tu conexión e intentá nuevamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -114,6 +155,8 @@ export default function ScanScreen() {
   function reset(): void {
     setPhotoUri(null);
     setDraft(null);
+    setIsManualMode(false);
+    setNoticeMessage(null);
     setErrors({});
     setIsSubmitting(false);
     setScreenState('idle');
@@ -137,15 +180,32 @@ export default function ScanScreen() {
       <View style={styles.container}>
         <Image source={{ uri: photoUri }} style={styles.preview} resizeMode="contain" />
 
-        <View style={styles.previewActions}>
-          <Pressable style={styles.retakeButton} onPress={retake}>
-            <Ionicons name="refresh" size={20} color={colors.background} />
-            <Text style={styles.retakeText}>Reintentar</Text>
-          </Pressable>
+        <View style={styles.previewFooter}>
+          <View style={styles.previewActions}>
+            <Pressable
+              style={styles.retakeButton}
+              onPress={retake}
+              accessibilityRole="button"
+              accessibilityLabel="Reintentar foto"
+            >
+              <Ionicons name="refresh" size={20} color={colors.background} />
+              <Text style={styles.retakeText}>Reintentar</Text>
+            </Pressable>
 
-          <View style={styles.processButtonWrapper}>
-            <PrimaryButton title="Procesar" onPress={() => void processImage()} />
+            <View style={styles.processButtonWrapper}>
+              <PrimaryButton title="Procesar con IA" onPress={() => void processImage()} />
+            </View>
           </View>
+
+          <Pressable
+            style={styles.manualPreviewButton}
+            onPress={() => startManualEntry(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Completar datos manualmente"
+          >
+            <Ionicons name="create-outline" size={18} color={colors.primary} />
+            <Text style={styles.galleryText}>Completar datos manualmente</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -156,13 +216,36 @@ export default function ScanScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.reviewContent}>
         {photoUri ? <Image source={{ uri: photoUri }} style={styles.reviewThumbnail} /> : null}
 
+        {noticeMessage ? (
+          <View style={styles.noticeBanner}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+            <Text style={styles.noticeText}>{noticeMessage}</Text>
+          </View>
+        ) : null}
+
         <MedicationReviewForm
           draft={draft}
           errors={errors}
           isSubmitting={isSubmitting}
           onChange={updateDraft}
           onSubmit={handleSubmit}
+          title={isManualMode ? 'Agregar Medicamento' : 'Revisar Medicamento'}
+          subtitle={
+            isManualMode
+              ? 'Completá los datos del medicamento para guardarlo y programar tus tomas.'
+              : 'Corregí los datos detectados por la IA antes de guardar.'
+          }
         />
+
+        <Pressable
+          style={styles.cancelReviewButton}
+          onPress={reset}
+          disabled={isSubmitting}
+          accessibilityRole="button"
+          accessibilityLabel="Cancelar y volver"
+        >
+          <Text style={styles.cancelReviewText}>Cancelar y volver</Text>
+        </Pressable>
       </ScrollView>
     );
   }
@@ -171,18 +254,39 @@ export default function ScanScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.idleContent}>
         <Ionicons name="scan" size={64} color={colors.primary} />
-        <Text style={styles.title}>Escanear Medicamento</Text>
+        <Text style={styles.title}>Agregar Medicamento</Text>
         <Text style={styles.subtitle}>
-          Capturá una foto del medicamento o elegí una desde tu galería.
+          Capturá una foto del envase, elegí una de tu galería o ingresá los datos manualmente.
         </Text>
 
         <View style={styles.primaryAction}>
           <PrimaryButton title="Tomar Foto" onPress={startCapturing} />
         </View>
 
-        <Pressable style={styles.galleryButton} onPress={() => void chooseFromLibrary()}>
+        <Pressable
+          style={styles.galleryButton}
+          onPress={() => void chooseFromLibrary()}
+          accessibilityRole="button"
+          accessibilityLabel="Elegir de Galería"
+        >
           <Ionicons name="images" size={20} color={colors.primary} />
           <Text style={styles.galleryText}>Elegir de Galería</Text>
+        </Pressable>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>o también podés</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={styles.manualCardButton}
+          onPress={() => startManualEntry(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Ingresar medicamento manualmente"
+        >
+          <Ionicons name="create-outline" size={22} color={colors.primary} />
+          <Text style={styles.manualCardText}>Ingresar medicamento a mano</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -202,6 +306,7 @@ const styles = StyleSheet.create({
   },
   reviewContent: {
     padding: 24,
+    paddingBottom: 40,
   },
   reviewThumbnail: {
     width: '100%',
@@ -209,6 +314,22 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
     borderRadius: 8,
     marginBottom: 20,
+  },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(13, 148, 136, 0.1)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textPrimary,
   },
   title: {
     fontSize: 24,
@@ -239,15 +360,57 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginVertical: 20,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  manualCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  manualCardText: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: '600',
+  },
   preview: {
     flex: 1,
     width: '100%',
   },
+  previewFooter: {
+    padding: 16,
+    gap: 12,
+  },
   previewActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
     gap: 12,
+  },
+  manualPreviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
   retakeButton: {
     flexDirection: 'row',
@@ -266,6 +429,16 @@ const styles = StyleSheet.create({
   },
   processButtonWrapper: {
     flex: 1,
+  },
+  cancelReviewButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelReviewText: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,

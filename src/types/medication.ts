@@ -1,5 +1,6 @@
 export interface MedicationDraft {
   name: string;
+  activeIngredient?: string;
   dosage: string;
   frequency: string;
   instructions: string;
