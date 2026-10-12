@@ -1,3 +1,4 @@
+import React from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { Medication } from '@/types';
@@ -8,9 +9,17 @@ interface MedicationListItemProps {
   onPress: () => void;
 }
 
-export function MedicationListItem({ medication, onPress }: MedicationListItemProps) {
+export const MedicationListItem = React.memo(function MedicationListItem({
+  medication,
+  onPress,
+}: MedicationListItemProps) {
   return (
-    <Pressable style={styles.item} onPress={onPress}>
+    <Pressable
+      style={styles.item}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Ver detalle de ${medication.name}`}
+    >
       <View style={styles.iconContainer}>
         <Ionicons name="medical" size={24} color={colors.primary} />
       </View>
@@ -26,7 +35,7 @@ export function MedicationListItem({ medication, onPress }: MedicationListItemPr
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   item: {

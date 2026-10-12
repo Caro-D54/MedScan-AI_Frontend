@@ -11,11 +11,16 @@ export function FormTextInput({ label, error, style, ...inputProps }: FormTextIn
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        accessibilityLabel={label}
         style={[styles.input, error ? styles.inputError : null, style]}
         placeholderTextColor={colors.textSecondary}
         {...inputProps}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

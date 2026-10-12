@@ -26,7 +26,7 @@ export function formatNextDoseTime(isoString?: string | null): string | undefine
 export async function getMedications(): Promise<Medication[]> {
   try {
     const [meds, treatments] = await Promise.all([
-      listMedications().catch(() => [] as any),
+      listMedications().catch((): Medication[] => []),
       getTreatments(true).catch(() => [] as TreatmentResponse[]),
     ]);
 
