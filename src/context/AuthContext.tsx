@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   login as loginRequest,
   register as registerRequest,
@@ -6,7 +6,7 @@ import {
   getCurrentUser,
 } from '@/services/authService';
 import { getStoredToken } from '@/services/tokenStorage';
-import { setAuthToken } from '@/services/apiClient';
+import { registerUnauthorizedHandler, setAuthToken } from '@/services/apiClient';
 import type { LoginCredentials, RegisterInput } from '@/types/auth';
 import type { User } from '@/types';
 
@@ -49,43 +49,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void restoreSession();
   }, []);
 
-  async function signIn(credentials: LoginCredentials): Promise<void> {
+  useEffect(() => {
+    registerUnauthorizedHandler(async () => {
+      await logoutRequest();
+      setUser(null);
+    });
+
+    return () => {
+      registerUnauthorizedHandler(null);
+    };
+  }, []);
+
+  const signIn = useCallback(async (credentials: LoginCredentials): Promise<void> => {
     const authenticatedUser = await loginRequest(credentials);
     setUser(authenticatedUser);
-  }
+  }, []);
 
-  async function signUp(input: RegisterInput): Promise<void> {
+  const signUp = useCallback(async (input: RegisterInput): Promise<void> => {
     const authenticatedUser = await registerRequest(input);
     setUser(authenticatedUser);
-  }
+  }, []);
 
-  async function signOut(): Promise<void> {
+  const signOut = useCallback(async (): Promise<void> => {
     await logoutRequest();
     setUser(null);
-  }
+  }, []);
 
-  async function login(credentialsOrEmail: LoginCredentials | string, password?: string): Promise<void> {
-    if (typeof credentialsOrEmail === 'string') {
-      await signIn({ email: credentialsOrEmail, password: password ?? '' });
-    } else {
-      await signIn(credentialsOrEmail);
-    }
-  }
+  const login = useCallback(
+    async (credentialsOrEmail: LoginCredentials | string, password?: string): Promise<void> => {
+      if (typeof credentialsOrEmail === 'string') {
+        await signIn({ email: credentialsOrEmail, password: password ?? '' });
+      } else {
+        await signIn(credentialsOrEmail);
+      }
+    },
+    [signIn],
+  );
 
-  async function register(input: FlexibleRegisterInput): Promise<void> {
-    await signUp({
-      name: input.name,
-      email: input.email,
-      password: input.password,
-      confirmPassword: input.confirmPassword ?? input.password,
-    });
-  }
+  const register = useCallback(
+    async (input: FlexibleRegisterInput): Promise<void> => {
+      await signUp({
+        name: input.name,
+        email: input.email,
+        password: input.password,
+        confirmPassword: input.confirmPassword ?? input.password,
+      });
+    },
+    [signUp],
+  );
 
   const logout = signOut;
 
   const value = useMemo(
     () => ({ user, isLoading, signIn, signUp, signOut, login, register, logout }),
-    [user, isLoading],
+    [user, isLoading, signIn, signUp, signOut, login, register, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

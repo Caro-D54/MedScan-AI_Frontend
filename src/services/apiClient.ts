@@ -39,6 +39,39 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 /**
+ * Tipo de callback para reaccionar ante respuestas 401 no autorizadas (auto-logout).
+ */
+export type UnauthorizedHandler = () => void | Promise<void>;
+
+let onUnauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  onUnauthorizedHandler = handler;
+}
+
+/**
+ * Interceptor de respuestas para gestionar errores 401 Unauthorized y desloguear al usuario
+ * cuando el token expira o es revocado, evitando bucles en endpoints de autenticación.
+ */
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const requestUrl = error?.config?.url ?? '';
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+
+    if (error?.response?.status === 401 && !isAuthEndpoint) {
+      setAuthToken(null);
+      if (onUnauthorizedHandler) {
+        await onUnauthorizedHandler();
+      }
+    }
+
+    return Promise.reject(error);
+  },
+);
+
+/**
  * Establece o elimina el token JWT Bearer en los encabezados globales de Axios.
  *
  * @param token - Token JWT válido o null/vacío para cerrar sesión.

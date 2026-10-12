@@ -2,6 +2,7 @@ import {
   apiClient,
   resolveApiBaseUrl,
   setAuthToken,
+  registerUnauthorizedHandler,
   DEFAULT_API_URL,
   DEFAULT_TIMEOUT_MS,
 } from '@/services/apiClient';
@@ -12,6 +13,7 @@ describe('apiClient & Environment Configuration (TDD)', () => {
   afterEach(() => {
     process.env.NODE_ENV = originalEnv;
     setAuthToken(null);
+    registerUnauthorizedHandler(null);
   });
 
   describe('resolveApiBaseUrl', () => {
@@ -72,6 +74,43 @@ describe('apiClient & Environment Configuration (TDD)', () => {
       setAuthToken('temporary-token');
       setAuthToken('');
       expect(apiClient.defaults.headers.common.Authorization).toBeUndefined();
+    });
+  });
+
+  describe('unauthorized response interceptor', () => {
+    it('clears auth token and calls registered handler on 401 for protected endpoints', async () => {
+      const handler = jest.fn();
+      registerUnauthorizedHandler(handler);
+      setAuthToken('my-token');
+
+      const responseInterceptor = (apiClient.interceptors.response as any).handlers[0];
+
+      await expect(
+        responseInterceptor.rejected({
+          response: { status: 401 },
+          config: { url: '/medications' },
+        }),
+      ).rejects.toBeDefined();
+
+      expect(apiClient.defaults.headers.common.Authorization).toBeUndefined();
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it('does not call handler on 401 when endpoint is /auth/login', async () => {
+      const handler = jest.fn();
+      registerUnauthorizedHandler(handler);
+      setAuthToken('my-token');
+
+      const responseInterceptor = (apiClient.interceptors.response as any).handlers[0];
+
+      await expect(
+        responseInterceptor.rejected({
+          response: { status: 401 },
+          config: { url: '/auth/login' },
+        }),
+      ).rejects.toBeDefined();
+
+      expect(handler).not.toHaveBeenCalled();
     });
   });
 });
