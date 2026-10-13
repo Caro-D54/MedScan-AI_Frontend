@@ -49,6 +49,18 @@ export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null)
   onUnauthorizedHandler = handler;
 }
 
+apiClient.interceptors.request.use((config) => {
+  if (
+    typeof window !== 'undefined' &&
+    typeof FormData !== 'undefined' &&
+    config.data instanceof FormData &&
+    config.headers
+  ) {
+    delete config.headers['Content-Type'];
+  }
+  return config;
+});
+
 /**
  * Interceptor de respuestas para gestionar errores 401 Unauthorized y desloguear al usuario
  * cuando el token expira o es revocado, evitando bucles en endpoints de autenticación.

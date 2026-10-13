@@ -30,7 +30,9 @@ export async function uploadScanImage(uri: string): Promise<ScanResult> {
   if (uri.startsWith('data:') || uri.startsWith('blob:')) {
     const fileResponse = await fetch(uri);
     const blob = await fileResponse.blob();
-    formData.append('file', blob, name);
+    const validType = blob.type && blob.type.startsWith('image/') ? blob.type : type;
+    const typedBlob = blob.type === validType ? blob : new Blob([blob], { type: validType });
+    formData.append('file', typedBlob, name);
   } else {
     formData.append('file', {
       uri,
