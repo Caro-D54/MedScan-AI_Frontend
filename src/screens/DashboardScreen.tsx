@@ -12,6 +12,7 @@ import {
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
 import { getMedications } from "../services/medicationService";
+import { markMedicationTakenState, subscribeMedicationChanges } from "../services/medicationEvents";
 import { markDoseTaken } from "../services/treatmentService";
 import type { Medication } from "@/types";
 
@@ -45,6 +46,12 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
 
   useEffect(() => {
     void loadMedications();
+    const unsubscribe = subscribeMedicationChanges(() => {
+      void loadMedications();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [loadMedications]);
 
   const handleRefresh = useCallback((): void => {
@@ -64,6 +71,7 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
     setIsTakingDose(true);
     try {
       await markDoseTaken(med.doseId);
+      markMedicationTakenState(med.id);
       Alert.alert("Toma registrada", `Registraste la toma de ${med.name}.`);
       void getMedications().then(setMeds);
     } catch {
@@ -120,9 +128,9 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
 
       {meds.length > 0 && (
         <Section title="Próxima dosis">
-          <View style={styles.nextDoseCard}>
+          <View style={[styles.nextDoseCard, meds[0].doseTaken && styles.nextDoseCardTaken]}>
             <View style={styles.nextDoseLeft}>
-              <View style={styles.iconCircle}>
+              <View style={[styles.iconCircle, meds[0].doseTaken && styles.iconCircleTaken]}>
                 <PillIcon size={16} />
               </View>
               <View>
@@ -138,7 +146,8 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
             <Pressable
               style={[
                 styles.takeNowButton,
-                (!meds[0].doseId || isTakingDose) && styles.takeNowButtonDisabled,
+                meds[0].doseTaken && styles.takeNowButtonTaken,
+                (!meds[0].doseId || isTakingDose) && !meds[0].doseTaken && styles.takeNowButtonDisabled,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Tomar ahora"
@@ -147,6 +156,11 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
             >
               {isTakingDose ? (
                 <ActivityIndicator size="small" color={colors.teal} />
+              ) : meds[0].doseTaken ? (
+                <>
+                  <CheckCircleIcon size={13} color={colors.success} />
+                  <Text style={styles.takeNowTextTaken}>Dosis tomada</Text>
+                </>
               ) : (
                 <>
                   <CheckCircleIcon size={13} color={colors.teal} />
@@ -182,13 +196,22 @@ const MedCard = React.memo(function MedCard({ med, onPress }: { med: Medication;
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.medCard, pressed && styles.medCardPressed]}
+      style={({ pressed }) => [
+        styles.medCard,
+        med.doseTaken && styles.medCardTaken,
+        pressed && styles.medCardPressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`Ver detalle de ${med.name}`}
     >
       <View style={styles.medCardHeader}>
         <Text style={styles.medCardName}>{med.name}</Text>
-        {med.status === "verified" ? (
+        {med.doseTaken ? (
+          <View style={styles.takenBadge}>
+            <CheckCircleIcon size={12} color={colors.success} />
+            <Text style={styles.takenBadgeText}>Dosis tomada</Text>
+          </View>
+        ) : med.status === "verified" ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>Verificado</Text>
           </View>
@@ -237,6 +260,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  nextDoseCardTaken: {
+    borderColor: "rgba(52, 211, 153, 0.35)",
+  },
   nextDoseLeft: { flexDirection: "row", alignItems: "center", gap: spacing.md, flexShrink: 1 },
   iconCircle: {
     width: 36,
@@ -245,6 +271,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(34,211,238,0.12)",
+  },
+  iconCircleTaken: {
+    backgroundColor: "rgba(52, 211, 153, 0.15)",
   },
   nextDoseName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textPrimary },
   nextDoseTimeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
@@ -261,10 +290,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(34,211,238,0.2)",
   },
+  takeNowButtonTaken: {
+    backgroundColor: "rgba(52, 211, 153, 0.15)",
+    borderColor: "rgba(52, 211, 153, 0.4)",
+  },
   takeNowButtonDisabled: {
     opacity: 0.4,
   },
   takeNowText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.teal },
+  takeNowTextTaken: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.success },
   list: { gap: spacing.sm },
   medCard: {
     padding: spacing.md,
@@ -272,6 +306,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgCard,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
+  },
+  medCardTaken: {
+    borderColor: "rgba(52, 211, 153, 0.35)",
   },
   medCardPressed: { backgroundColor: colors.bgCardHover },
   medCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -286,4 +323,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(34,211,238,0.2)",
   },
   badgeText: { fontFamily: fonts.bodySemiBold, fontSize: 10, color: colors.teal },
+  takenBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(52, 211, 153, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(52, 211, 153, 0.4)",
+  },
+  takenBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.success,
+  },
 });

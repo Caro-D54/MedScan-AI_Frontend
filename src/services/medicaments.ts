@@ -1,5 +1,6 @@
 import { listMedications } from './medicationService';
 import { getTreatments, type TreatmentResponse, type DoseResponse } from './treatmentService';
+import { isMedicationMarkedTaken } from './medicationEvents';
 import type { Medication } from '@/types';
 
 export function formatNextDoseTime(isoString?: string | null): string | undefined {
@@ -34,15 +35,22 @@ export async function getMedications(): Promise<Medication[]> {
       return [];
     }
 
-    // Mapa de dosis pendientes por medicationId
+    // Mapa de dosis pendientes y estado de dosis tomadas por medicationId
     const pendingDoseByMedId = new Map<string, DoseResponse>();
+    const takenMedIds = new Set<string>();
+
     for (const treatment of treatments) {
       const medId = treatment.medicationId != null ? String(treatment.medicationId) : null;
       if (!medId) {
         continue;
       }
 
-      const pendingDoses = (treatment.doses ?? [])
+      const doses = treatment.doses ?? [];
+      if (doses.some((d) => d.status === 'TAKEN')) {
+        takenMedIds.add(medId);
+      }
+
+      const pendingDoses = doses
         .filter((d) => d.status === 'PENDING')
         .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
@@ -54,6 +62,7 @@ export async function getMedications(): Promise<Medication[]> {
     return meds.map((item) => {
       const stringId = String(item.id);
       const pendingDose = pendingDoseByMedId.get(stringId);
+      const isTaken = takenMedIds.has(stringId) || isMedicationMarkedTaken(stringId);
 
       return {
         ...item,
@@ -62,6 +71,7 @@ export async function getMedications(): Promise<Medication[]> {
         notes: item.instructions ?? '',
         withFood: item.withFood ?? false,
         doseId: pendingDose ? String(pendingDose.id) : undefined,
+        doseTaken: isTaken,
         nextDose: pendingDose ? formatNextDoseTime(pendingDose.scheduledAt) : undefined,
       };
     });

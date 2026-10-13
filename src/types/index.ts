@@ -7,6 +7,7 @@ export interface Medication {
   instructions: string;
   dose?: string;
   doseId?: string;
+  doseTaken?: boolean;
   nextDose?: string;
   nextDoseTime?: string;
   status?: string;

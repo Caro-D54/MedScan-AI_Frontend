@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listMedications } from '@/services/medicationService';
+import { subscribeMedicationChanges } from '@/services/medicationEvents';
 import type { Medication } from '@/types';
 
 /**
@@ -28,8 +29,13 @@ export function useMedications() {
       }
     });
 
+    const unsubscribe = subscribeMedicationChanges(() => {
+      void fetchMedications();
+    });
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, [fetchMedications]);
 

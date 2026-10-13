@@ -1,5 +1,6 @@
 import { apiClient } from './apiClient';
 import { createTreatment, markDoseTaken } from './treatmentService';
+import { clearMedicationTakenState, notifyMedicationChanged } from './medicationEvents';
 import { parseFrequencyToHours } from '@/utils/frequency';
 import type { MedicationDraft } from '@/types/medication';
 import type { DoseRecord, Medication } from '@/types';
@@ -107,7 +108,11 @@ export function createMedication(
   const payload = toBackendMedicationPayload(draft);
   return apiClient
     .post<RawMedicament>('/medications', payload)
-    .then((response) => normalizeMedication(response?.data));
+    .then((response) => {
+      const normalized = normalizeMedication(response?.data);
+      notifyMedicationChanged();
+      return normalized;
+    });
 }
 
 /**
@@ -120,14 +125,21 @@ export function updateMedication(
   const payload = toBackendMedicationPayload(draft);
   return apiClient
     .put<RawMedicament>(`/medications/${id}`, payload)
-    .then((response) => normalizeMedication(response?.data));
+    .then((response) => {
+      const normalized = normalizeMedication(response?.data);
+      notifyMedicationChanged();
+      return normalized;
+    });
 }
 
 /**
  * Elimina un medicamento por su ID.
  */
 export function deleteMedication(id: string): Promise<void> {
-  return apiClient.delete(`/medications/${id}`);
+  return apiClient.delete(`/medications/${id}`).then(() => {
+    clearMedicationTakenState(id);
+    notifyMedicationChanged();
+  });
 }
 
 export function markDoseAsTaken(
@@ -137,11 +149,14 @@ export function markDoseAsTaken(
   if (!doseId) {
     return Promise.reject(new Error('doseId es requerido para registrar la toma.'));
   }
-  return markDoseTaken(doseId).then((dose) => ({
-    id: String(dose.id),
-    medicationId: doseId,
-    takenAt,
-  }));
+  return markDoseTaken(doseId).then((dose) => {
+    notifyMedicationChanged();
+    return {
+      id: String(dose.id),
+      medicationId: doseId,
+      takenAt,
+    };
+  });
 }
 
 export async function saveMedicationFromScan(

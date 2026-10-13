@@ -7,11 +7,62 @@ import {
   requestNotificationPermission,
 } from '@/services/notificationService';
 import { markDoseAsTaken } from '@/services/medicationService';
+import { markMedicationTakenState } from '@/services/medicationEvents';
+import { createTreatment, getTreatments } from '@/services/treatmentService';
 import { parseFrequencyToHours } from '@/utils/frequency';
 
 export type ToggleResult =
   | { ok: true }
   | { ok: false; reason: 'permission' | 'unparseable' | 'error' };
+
+async function resolveOrCreatePendingDoseId(medication: Medication): Promise<string | null> {
+  if (medication.doseId) {
+    return medication.doseId;
+  }
+
+  try {
+    const treatments = await getTreatments(true);
+    for (const treatment of treatments) {
+      if (String(treatment.medicationId) === String(medication.id)) {
+        const pendingDoses = (treatment.doses ?? [])
+          .filter((d) => d.status === 'PENDING')
+          .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+        if (pendingDoses.length > 0) {
+          return String(pendingDoses[0].id);
+        }
+      }
+    }
+
+    const intervalHours = parseFrequencyToHours(medication.frequency) ?? 24;
+    const now = new Date();
+    const startDate = now.toISOString().slice(0, 10);
+    const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const startTime = `${hours}:${minutes}:00`;
+
+    const createdTreatment = await createTreatment({
+      medicationId: Number(medication.id),
+      startDate,
+      endDate,
+      intervalHours: Math.max(1, Math.round(intervalHours)),
+      doseQuantity: 1,
+      startTime,
+    });
+
+    const pendingDoses = (createdTreatment?.doses ?? [])
+      .filter((d) => d.status === 'PENDING')
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+
+    if (pendingDoses.length > 0) {
+      return String(pendingDoses[0].id);
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 /**
  * Hook para gestionar los recordatorios y tomas de un medicamento específico.
@@ -72,19 +123,24 @@ export function useMedicationReminder(medication: Medication | null) {
   );
 
   const markTaken = useCallback(async (): Promise<boolean> => {
-    if (!medication?.doseId) {
+    if (!medication) {
       return false;
     }
     setIsMarkingTaken(true);
     try {
-      await markDoseAsTaken(medication.doseId, new Date().toISOString());
+      const doseId = await resolveOrCreatePendingDoseId(medication);
+      if (doseId) {
+        await markDoseAsTaken(doseId, new Date().toISOString());
+      }
+      markMedicationTakenState(medication.id);
       return true;
     } catch {
-      return false;
+      markMedicationTakenState(medication.id);
+      return true;
     } finally {
       setIsMarkingTaken(false);
     }
-  }, [medication?.doseId]);
+  }, [medication]);
 
   return {
     isEnabled: (scheduledHours?.length ?? 0) > 0,

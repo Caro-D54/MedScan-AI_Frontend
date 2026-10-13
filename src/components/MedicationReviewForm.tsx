@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { FormTextInput } from '@/components/FormTextInput';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { colors } from '@/theme';
@@ -13,6 +14,7 @@ interface MedicationReviewFormProps {
   title?: string;
   subtitle?: string;
   submitLabel?: string;
+  isAiAssisted?: boolean;
 }
 
 export function MedicationReviewForm({
@@ -24,11 +26,19 @@ export function MedicationReviewForm({
   title = 'Revisar Medicamento',
   subtitle = 'Corregí los datos detectados por la IA antes de guardar.',
   submitLabel = 'Guardar Medicamento',
+  isAiAssisted = false,
 }: MedicationReviewFormProps) {
   return (
     <View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
+
+      {isAiAssisted ? (
+        <View style={styles.sectionBadgeAi}>
+          <Ionicons name="sparkles" size={16} color={colors.primary} />
+          <Text style={styles.sectionBadgeAiText}>Datos leídos por IA de la imagen</Text>
+        </View>
+      ) : null}
 
       <FormTextInput
         label="Nombre comercial"
@@ -45,6 +55,15 @@ export function MedicationReviewForm({
         onChangeText={(value) => onChange('activeIngredient', value)}
         error={errors.activeIngredient}
       />
+
+      {isAiAssisted ? (
+        <View style={styles.sectionBadgeManual}>
+          <Ionicons name="medkit-outline" size={16} color={colors.success} />
+          <Text style={styles.sectionBadgeManualText}>
+            Ingresar manualmente según lo indicado por el médico
+          </Text>
+        </View>
+      ) : null}
 
       <FormTextInput
         label="Dosis indicada"
@@ -89,6 +108,41 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 20,
     color: colors.textSecondary,
+  },
+  sectionBadgeAi: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(34, 211, 238, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  sectionBadgeAiText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  sectionBadgeManual: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.35)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  sectionBadgeManualText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.success,
   },
   instructionsInput: {
     textAlignVertical: 'top',

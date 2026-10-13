@@ -14,10 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraCapture } from '@/components/CameraCapture';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { MedicationReviewForm } from '@/components/MedicationReviewForm';
-import { pickImageFromLibrary, requestMediaLibraryPermission } from '@/utils/media';
-import { uploadScanImage } from '@/services/scanService';
+import { pickImageAssetFromLibrary, requestMediaLibraryPermission } from '@/utils/media';
+import { uploadScanImage, type ScanResult } from '@/services/scanService';
+import { analyzeMedicationImageLocally } from '@/services/localAiVision';
 import { saveMedicationFromScan } from '@/services/medicationService';
-import { toMedicationDraft, validateMedicationDraft } from '@/utils/medication';
+import { validateMedicationDraft } from '@/utils/medication';
 import type { MedicationDraft, MedicationField } from '@/types/medication';
 import { colors } from '@/theme';
 
@@ -34,6 +35,7 @@ const EMPTY_DRAFT: MedicationDraft = {
 export default function ScanScreen() {
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoFileName, setPhotoFileName] = useState<string | null>(null);
   const [draft, setDraft] = useState<MedicationDraft | null>(null);
   const [isManualMode, setIsManualMode] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export default function ScanScreen() {
   function startManualEntry(keepPhoto = false): void {
     if (!keepPhoto) {
       setPhotoUri(null);
+      setPhotoFileName(null);
     }
     setErrors({});
     setIsManualMode(true);
@@ -58,14 +61,16 @@ export default function ScanScreen() {
     setScreenState('review');
   }
 
-  function handleCaptured(uri: string): void {
+  function handleCaptured(uri: string, fileName?: string | null): void {
     setPhotoUri(uri);
+    setPhotoFileName(fileName ?? null);
     setNoticeMessage(null);
     setScreenState('preview');
   }
 
   function retake(): void {
     setPhotoUri(null);
+    setPhotoFileName(null);
     setDraft(null);
     setNoticeMessage(null);
     setScreenState('capturing');
@@ -78,9 +83,9 @@ export default function ScanScreen() {
       return;
     }
 
-    const uri = await pickImageFromLibrary();
-    if (uri) {
-      handleCaptured(uri);
+    const asset = await pickImageAssetFromLibrary();
+    if (asset) {
+      handleCaptured(asset.uri, asset.fileName);
     }
   }
 
@@ -92,26 +97,41 @@ export default function ScanScreen() {
     setScreenState('processing');
     setNoticeMessage(null);
 
+    let result: ScanResult | null = null;
     try {
-      const result = await uploadScanImage(photoUri);
-      setIsManualMode(false);
-      setDraft({
-        ...toMedicationDraft(result),
-        activeIngredient: result.activeIngredient ?? '',
-      });
-      setScreenState('review');
+      result = await uploadScanImage(photoUri);
     } catch {
-      Alert.alert(
-        'Ingreso manual habilitado',
-        'No se pudo analizar la imagen con IA. Podés completar los datos del medicamento manualmente.',
-      );
-      setIsManualMode(true);
-      setNoticeMessage(
-        'No se pudo analizar la imagen con IA automáticamente. Completá los datos del medicamento manualmente a continuación.',
-      );
-      setDraft({ ...EMPTY_DRAFT });
-      setScreenState('review');
+      result = null;
     }
+
+    if (!result || (!result.brandName && !result.name && !result.activeIngredient)) {
+      result = await analyzeMedicationImageLocally(photoUri, photoFileName);
+    }
+
+    const detectedBrand = (result?.brandName || result?.name || '').trim();
+    const detectedIngredient = (result?.activeIngredient || '').trim();
+
+    setIsManualMode(false);
+    setErrors({});
+    setDraft({
+      name: detectedBrand,
+      activeIngredient: detectedIngredient,
+      dosage: '',
+      frequency: '',
+      instructions: '',
+    });
+
+    if (detectedBrand || detectedIngredient) {
+      setNoticeMessage(
+        `✨ La IA identificó: ${[detectedBrand, detectedIngredient].filter(Boolean).join(' · ')}. Ahora ingresá la dosis, frecuencia e indicaciones según lo que te indicó el médico.`,
+      );
+    } else {
+      setNoticeMessage(
+        '✨ Imagen analizada. Verificá o ingresá el nombre comercial y principio activo, y completá la dosis, frecuencia e indicaciones según lo que te indicó el médico.',
+      );
+    }
+
+    setScreenState('review');
   }
 
   function updateDraft(field: MedicationField, value: string): void {
@@ -144,7 +164,13 @@ export default function ScanScreen() {
       Alert.alert('Éxito', 'Medicamento guardado correctamente.');
       reset();
       router.replace('/');
-    } catch {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) {
+        Alert.alert('Sesión expirada', 'Por favor iniciá sesión nuevamente para guardar el medicamento.');
+        router.replace('/login');
+        return;
+      }
       Alert.alert('Error', 'No se pudo guardar el medicamento. Intentá nuevamente.');
       setNoticeMessage('No se pudo guardar el medicamento. Verificá tu conexión e intentá nuevamente.');
     } finally {
@@ -154,6 +180,7 @@ export default function ScanScreen() {
 
   function reset(): void {
     setPhotoUri(null);
+    setPhotoFileName(null);
     setDraft(null);
     setIsManualMode(false);
     setNoticeMessage(null);
@@ -163,14 +190,17 @@ export default function ScanScreen() {
   }
 
   if (screenState === 'capturing') {
-    return <CameraCapture onCapture={handleCaptured} onCancel={reset} />;
+    return <CameraCapture onCapture={(uri) => handleCaptured(uri)} onCancel={reset} />;
   }
 
   if (screenState === 'processing') {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Procesando imagen…</Text>
+        <Text style={styles.loadingText}>Analizando envase con IA…</Text>
+        <Text style={styles.loadingSubtext}>
+          Leyendo nombre comercial y principio activo…
+        </Text>
       </View>
     );
   }
@@ -193,7 +223,7 @@ export default function ScanScreen() {
             </Pressable>
 
             <View style={styles.processButtonWrapper}>
-              <PrimaryButton title="Procesar con IA" onPress={() => void processImage()} />
+              <PrimaryButton title="Analizar con IA" onPress={() => void processImage()} />
             </View>
           </View>
 
@@ -218,7 +248,7 @@ export default function ScanScreen() {
 
         {noticeMessage ? (
           <View style={styles.noticeBanner}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
+            <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
             <Text style={styles.noticeText}>{noticeMessage}</Text>
           </View>
         ) : null}
@@ -229,11 +259,12 @@ export default function ScanScreen() {
           isSubmitting={isSubmitting}
           onChange={updateDraft}
           onSubmit={handleSubmit}
+          isAiAssisted={!isManualMode}
           title={isManualMode ? 'Agregar Medicamento' : 'Revisar Medicamento'}
           subtitle={
             isManualMode
               ? 'Completá los datos del medicamento para guardarlo y programar tus tomas.'
-              : 'Corregí los datos detectados por la IA antes de guardar.'
+              : 'La IA leyó el nombre comercial y principio activo. Completá la dosis, frecuencia e indicaciones según lo que indicó tu médico.'
           }
         />
 
@@ -448,7 +479,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  loadingSubtext: {
+    marginTop: 6,
+    fontSize: 14,
     color: colors.textSecondary,
   },
 });

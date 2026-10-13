@@ -15,9 +15,13 @@ export function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
   const cameraRef = useRef<CameraViewRef>(null);
 
   async function takePhoto(): Promise<void> {
-    const photo = await cameraRef.current?.takePictureAsync();
-    if (photo) {
-      onCapture(photo.uri);
+    try {
+      const photo = await cameraRef.current?.takePictureAsync();
+      if (photo?.uri) {
+        onCapture(photo.uri);
+      }
+    } catch {
+      onCancel();
     }
   }
 
@@ -34,6 +38,9 @@ export function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
         </Text>
         <Pressable style={styles.primaryButton} onPress={requestPermission}>
           <Text style={styles.primaryButtonText}>Permitir acceso</Text>
+        </Pressable>
+        <Pressable style={styles.cancelLinkButton} onPress={onCancel}>
+          <Text style={styles.cancelLinkText}>Cancelar y volver</Text>
         </Pressable>
       </View>
     );
@@ -125,5 +132,15 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontSize: 16,
     fontWeight: '600',
+  },
+  cancelLinkButton: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  cancelLinkText: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '500',
   },
 });

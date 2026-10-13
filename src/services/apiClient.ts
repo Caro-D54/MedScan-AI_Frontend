@@ -83,3 +83,14 @@ export function setAuthToken(token: string | null): void {
     delete apiClient.defaults.headers.common.Authorization;
   }
 }
+
+try {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    const existingToken = window.localStorage.getItem('auth_token');
+    if (existingToken) {
+      setAuthToken(existingToken);
+    }
+  }
+} catch {
+  // Ignorar errores de acceso a localStorage en entornos restringidos
+}

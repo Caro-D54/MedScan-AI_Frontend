@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,8 @@ export default function MedicationDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const reminder = useMedicationReminder(medication);
 
@@ -43,7 +46,7 @@ export default function MedicationDetailScreen() {
       setDraft(toDraft(data));
     } catch {
       Alert.alert('Error', 'No se pudo cargar el medicamento.');
-      router.back();
+      router.replace('/');
     } finally {
       setIsLoading(false);
     }
@@ -54,6 +57,7 @@ export default function MedicationDetailScreen() {
   }, [loadMedication]);
 
   function startEditing(): void {
+    setFeedback(null);
     setIsEditing(true);
   }
 
@@ -93,45 +97,57 @@ export default function MedicationDetailScreen() {
       Alert.alert('Éxito', 'Medicamento actualizado.');
       await loadMedication();
       setIsEditing(false);
+      setFeedback({ type: 'success', text: 'Medicamento actualizado correctamente.' });
     } catch {
       Alert.alert('Error', 'No se pudo actualizar el medicamento.');
+      setFeedback({ type: 'error', text: 'No se pudo actualizar el medicamento.' });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   function confirmDelete(): void {
-    Alert.alert('Eliminar medicamento', '¿Estás segura de que querés eliminarlo?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => void removeMedication() },
-    ]);
+    setFeedback(null);
+    setShowDeleteConfirm(true);
   }
 
   async function handleToggleReminders(enabled: boolean): Promise<void> {
+    setFeedback(null);
     const result = await reminder.toggle(enabled);
     if (result.ok) {
+      setFeedback({
+        type: 'success',
+        text: enabled
+          ? 'Recordatorios activados correctamente.'
+          : 'Recordatorios desactivados.',
+      });
       return;
     }
 
     if (result.reason === 'permission') {
-      Alert.alert(
-        'Permiso requerido',
-        'Necesitás habilitar las notificaciones para recibir recordatorios de toma.',
-      );
+      const msg = 'Necesitás habilitar las notificaciones para recibir recordatorios de toma.';
+      Alert.alert('Permiso requerido', msg);
+      setFeedback({ type: 'error', text: msg });
     } else {
-      Alert.alert(
-        'Frecuencia no reconocida',
-        'No pudimos interpretar la frecuencia para programar los recordatorios.',
-      );
+      const msg = 'No pudimos interpretar la frecuencia para programar los recordatorios (ej. "cada 8 horas" o "cada 24hs").';
+      Alert.alert('Frecuencia no reconocida', msg);
+      setFeedback({ type: 'error', text: msg });
     }
   }
 
   async function handleMarkTaken(): Promise<void> {
+    setFeedback(null);
     const succeeded = await reminder.markTaken();
-    Alert.alert(
-      succeeded ? 'Éxito' : 'Error',
-      succeeded ? 'Toma registrada.' : 'No se pudo registrar la toma.',
-    );
+    if (succeeded) {
+      router.replace('/');
+      return;
+    }
+
+    Alert.alert('Error', 'No se pudo registrar la toma.');
+    setFeedback({
+      type: 'error',
+      text: 'No se pudo registrar la toma. Intentá nuevamente.',
+    });
   }
 
   async function removeMedication(): Promise<void> {
@@ -143,10 +159,13 @@ export default function MedicationDetailScreen() {
     try {
       await cancelMedicationReminders(id).catch(() => undefined);
       await deleteMedication(id);
+      setShowDeleteConfirm(false);
       Alert.alert('Éxito', 'Medicamento eliminado.');
-      router.back();
+      router.replace('/');
     } catch {
+      setShowDeleteConfirm(false);
       Alert.alert('Error', 'No se pudo eliminar el medicamento.');
+      setFeedback({ type: 'error', text: 'No se pudo eliminar el medicamento.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -190,6 +209,22 @@ export default function MedicationDetailScreen() {
         <Text style={styles.name}>{medication.name}</Text>
       </View>
 
+      {feedback ? (
+        <View
+          style={[
+            styles.feedbackBanner,
+            feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess,
+          ]}
+        >
+          <Ionicons
+            name={feedback.type === 'error' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+            size={20}
+            color={feedback.type === 'error' ? colors.danger : colors.primary}
+          />
+          <Text style={styles.feedbackText}>{feedback.text}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.detailCard}>
         <DetailRow label="Principio activo" value={medication.activeIngredient ?? ''} />
         <DetailRow label="Dosis indicada" value={medication.dosage} />
@@ -214,8 +249,49 @@ export default function MedicationDetailScreen() {
           isLoading={reminder.isMarkingTaken}
         />
         <PrimaryButton title="Editar" onPress={startEditing} />
-        <PrimaryButton title="Eliminar" variant="danger" onPress={confirmDelete} />
+        <PrimaryButton
+          title="Eliminar"
+          variant="danger"
+          onPress={confirmDelete}
+          isLoading={isSubmitting}
+        />
       </View>
+
+      <Modal
+        visible={showDeleteConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="trash-outline" size={28} color={colors.danger} />
+            </View>
+            <Text style={styles.modalTitle}>Eliminar medicamento</Text>
+            <Text style={styles.modalMessage}>
+              {`¿Estás segura de que querés eliminar "${medication.name}"? Esta acción no se puede deshacer.`}
+            </Text>
+            <View style={styles.modalButtons}>
+              <View style={styles.modalButtonItem}>
+                <PrimaryButton
+                  title="Cancelar"
+                  onPress={() => setShowDeleteConfirm(false)}
+                  disabled={isSubmitting}
+                />
+              </View>
+              <View style={styles.modalButtonItem}>
+                <PrimaryButton
+                  title="Sí, eliminar"
+                  variant="danger"
+                  onPress={() => void removeMedication()}
+                  isLoading={isSubmitting}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -271,6 +347,29 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     textAlign: 'center',
   },
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  feedbackSuccess: {
+    backgroundColor: 'rgba(13, 148, 136, 0.12)',
+    borderColor: colors.primary,
+  },
+  feedbackError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: colors.danger,
+  },
+  feedbackText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontWeight: '500',
+  },
   detailCard: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -298,5 +397,53 @@ const styles = StyleSheet.create({
   },
   cancelContainer: {
     marginTop: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(7, 13, 23, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.bgCard,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalButtonItem: {
+    flex: 1,
   },
 });

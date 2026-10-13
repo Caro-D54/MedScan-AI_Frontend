@@ -1,5 +1,6 @@
 import { apiClient } from '@/services/apiClient';
 import { uploadScanImage } from '@/services/scanService';
+import { extractMedicationFromText } from '@/services/localAiVision';
 
 jest.mock('@/services/apiClient', () => ({
   apiClient: {
@@ -135,6 +136,29 @@ describe('scanService (TDD)', () => {
       (apiClient.post as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       await expect(uploadScanImage('file://photo.jpg')).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('extractMedicationFromText (Local AI Vision & Vademecum)', () => {
+    it('extracts commercial brand name and active ingredient while leaving dosage, frequency, and instructions empty', () => {
+      const ocrText = 'TAFIROL FORTE\nParacetamol 500 mg\nVenta Libre\nIndustria Argentina';
+      const result = extractMedicationFromText(ocrText);
+
+      expect(result.brandName).toBe('Tafirol');
+      expect(result.activeIngredient).toBe('Paracetamol');
+      expect(result.dosage).toBe('');
+      expect(result.frequency).toBe('');
+      expect(result.instructions).toBe('');
+    });
+
+    it('infers active ingredient from commercial brand name on box', () => {
+      const result = extractMedicationFromText('IBUPIRAC 400\n20 cápsulas blandas');
+
+      expect(result.brandName).toBe('Ibupirac');
+      expect(result.activeIngredient).toBe('Ibuprofeno');
+      expect(result.dosage).toBe('');
+      expect(result.frequency).toBe('');
+      expect(result.instructions).toBe('');
     });
   });
 });

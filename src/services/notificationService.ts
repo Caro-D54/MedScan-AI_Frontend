@@ -52,7 +52,20 @@ export async function setupDoseReminderCategory(): Promise<void> {
 
 export async function requestNotificationPermission(): Promise<boolean> {
   if (isWeb()) {
-    return false;
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (window.Notification.permission === 'granted') {
+          return true;
+        }
+        if (window.Notification.permission !== 'denied') {
+          const result = await window.Notification.requestPermission();
+          return result === 'granted' || result === 'default';
+        }
+      }
+    } catch {
+      // Fallback para navegadores sin API Notification
+    }
+    return true;
   }
 
   const current = await Notifications.getPermissionsAsync();
@@ -96,42 +109,41 @@ export async function registerPushTokenWithBackend(): Promise<string | null> {
 export async function scheduleMedicationReminders(
   medication: Medication,
 ): Promise<StoredSchedule | null> {
-  if (isWeb()) {
-    return null;
-  }
-
   const frequencyInHours = parseFrequencyToHours(medication.frequency);
   if (frequencyInHours === null) {
     return null;
   }
 
   await cancelMedicationReminders(medication.id);
-  await ensureAndroidChannel();
 
   const timesPerDay = 24 / frequencyInHours;
   const hours = buildDailyReminderHours(timesPerDay, new Date());
   const notificationIds: string[] = [];
 
-  for (const hour of hours) {
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Hora de tu medicamento',
-        body: medication.dosage ? `${medication.name} — ${medication.dosage}` : medication.name,
-        categoryIdentifier: REMINDER_CATEGORY_ID,
-        data: {
-          ...(medication.doseId ? { doseId: medication.doseId } : {}),
-          medicationId: medication.id,
-          url: `/medication/${medication.id}`,
+  if (!isWeb()) {
+    await ensureAndroidChannel();
+
+    for (const hour of hours) {
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Hora de tu medicamento',
+          body: medication.dosage ? `${medication.name} — ${medication.dosage}` : medication.name,
+          categoryIdentifier: REMINDER_CATEGORY_ID,
+          data: {
+            ...(medication.doseId ? { doseId: medication.doseId } : {}),
+            medicationId: medication.id,
+            url: `/medication/${medication.id}`,
+          },
         },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        channelId: REMINDER_CHANNEL_ID,
-        hour,
-        minute: 0,
-      },
-    });
-    notificationIds.push(notificationId);
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          channelId: REMINDER_CHANNEL_ID,
+          hour,
+          minute: 0,
+        },
+      });
+      notificationIds.push(notificationId);
+    }
   }
 
   const schedule = { hours, notificationIds };
@@ -140,10 +152,6 @@ export async function scheduleMedicationReminders(
 }
 
 export async function cancelMedicationReminders(medicationId: string): Promise<void> {
-  if (isWeb()) {
-    return;
-  }
-
   const schedules = await readSchedules();
   const schedule = schedules[medicationId];
 
@@ -151,8 +159,10 @@ export async function cancelMedicationReminders(medicationId: string): Promise<v
     return;
   }
 
-  for (const notificationId of schedule.notificationIds) {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
+  if (!isWeb()) {
+    for (const notificationId of schedule.notificationIds) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+    }
   }
 
   delete schedules[medicationId];
@@ -162,10 +172,6 @@ export async function cancelMedicationReminders(medicationId: string): Promise<v
 export async function getMedicationReminderHours(
   medicationId: string,
 ): Promise<number[] | null> {
-  if (isWeb()) {
-    return null;
-  }
-
   const schedules = await readSchedules();
   return schedules[medicationId]?.hours ?? null;
 }
@@ -187,11 +193,26 @@ async function storeSchedule(medicationId: string, schedule: StoredSchedule): Pr
   await persistSchedules(schedules);
 }
 
+function hasWebStorage(): boolean {
+  try {
+    return isWeb() && typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  } catch {
+    return false;
+  }
+}
+
 async function readSchedules(): Promise<SchedulesByMedication> {
-  const raw = await SecureStore.getItemAsync(SCHEDULE_STORAGE_KEY);
+  const raw = hasWebStorage()
+    ? window.localStorage.getItem(SCHEDULE_STORAGE_KEY)
+    : await SecureStore.getItemAsync(SCHEDULE_STORAGE_KEY);
   return raw ? (JSON.parse(raw) as SchedulesByMedication) : {};
 }
 
 async function persistSchedules(schedules: SchedulesByMedication): Promise<void> {
-  await SecureStore.setItemAsync(SCHEDULE_STORAGE_KEY, JSON.stringify(schedules));
+  const serialized = JSON.stringify(schedules);
+  if (hasWebStorage()) {
+    window.localStorage.setItem(SCHEDULE_STORAGE_KEY, serialized);
+    return;
+  }
+  await SecureStore.setItemAsync(SCHEDULE_STORAGE_KEY, serialized);
 }

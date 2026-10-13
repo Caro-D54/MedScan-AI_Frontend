@@ -122,4 +122,30 @@ describe('DashboardScreen (TDD)', () => {
       'No hay una toma programada para este medicamento.',
     );
   });
+
+  it('displays "Dosis tomada" when medication has doseTaken set to true', async () => {
+    const mockMeds: Medication[] = [
+      {
+        id: '1',
+        name: 'Tafirol',
+        dosage: '500 mg',
+        dose: '500 mg',
+        frequency: 'cada 8 horas',
+        instructions: 'con agua',
+        doseId: '303',
+        doseTaken: true,
+        nextDose: '16:00 hs',
+      },
+    ];
+
+    (getMedications as jest.Mock).mockResolvedValueOnce(mockMeds);
+
+    let component!: ReturnType<typeof renderer.create>;
+    await act(async () => {
+      component = renderer.create(<DashboardScreen onOpenDetail={onOpenDetail} />);
+    });
+
+    const takenTexts = component.root.findAllByProps({ children: 'Dosis tomada' });
+    expect(takenTexts.length).toBeGreaterThanOrEqual(1);
+  });
 });
