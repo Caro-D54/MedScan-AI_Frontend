@@ -20,6 +20,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <DashboardScreen
         userName={user?.name ?? undefined}
+        avatarUri={user?.avatarUri}
         onOpenDetail={handleOpenDetail}
       />
     </SafeAreaView>

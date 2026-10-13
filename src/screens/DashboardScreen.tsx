@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,23 +14,27 @@ import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
 import { getMedications } from "../services/medicationService";
 import { markMedicationTakenState, subscribeMedicationChanges } from "../services/medicationEvents";
+import { getProfileSync, subscribeProfileChanges } from "../services/profileService";
 import { markDoseTaken } from "../services/treatmentService";
 import type { Medication } from "@/types";
 
 export interface DashboardScreenProps {
   onOpenDetail?: (med: Medication) => void;
   userName?: string;
+  avatarUri?: string | null;
 }
 
-export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps) {
+export function DashboardScreen({ onOpenDetail, userName, avatarUri }: DashboardScreenProps) {
   const [meds, setMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isTakingDose, setIsTakingDose] = useState(false);
+  const [profileSnapshot, setProfileSnapshot] = useState(() => getProfileSync(null));
 
-  const displayName = userName?.trim() || "Alex";
+  const displayName = userName?.trim() || profileSnapshot.name?.trim() || "Alex";
   const initial = displayName.charAt(0).toUpperCase() || "A";
+  const resolvedAvatarUri = avatarUri ?? profileSnapshot.avatarUri ?? null;
 
   const loadMedications = useCallback(async (): Promise<void> => {
     try {
@@ -46,11 +51,15 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
 
   useEffect(() => {
     void loadMedications();
-    const unsubscribe = subscribeMedicationChanges(() => {
+    const unsubscribeMeds = subscribeMedicationChanges(() => {
       void loadMedications();
     });
+    const unsubscribeProfile = subscribeProfileChanges((updated) => {
+      setProfileSnapshot(updated);
+    });
     return () => {
-      unsubscribe();
+      unsubscribeMeds();
+      unsubscribeProfile();
     };
   }, [loadMedications]);
 
@@ -104,7 +113,11 @@ export function DashboardScreen({ onOpenDetail, userName }: DashboardScreenProps
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
+            {resolvedAvatarUri ? (
+              <Image source={{ uri: resolvedAvatarUri }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{initial}</Text>
+            )}
           </View>
           <View>
             <Text style={styles.brand}>MedScan AI</Text>
@@ -234,6 +247,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.teal,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   avatarText: { fontFamily: fonts.displaySemiBold, fontSize: 14, color: colors.bgPrimary },
   brand: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textPrimary },

@@ -21,6 +21,7 @@ export interface AuthContextValue {
   login: (credentialsOrEmail: LoginCredentials | string, password?: string) => Promise<void>;
   register: (input: FlexibleRegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser?: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -100,9 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = signOut;
 
+  const updateUser = useCallback((updates: Partial<User>): void => {
+    setUser((current) => (current ? { ...current, ...updates } : current));
+  }, []);
+
   const value = useMemo(
-    () => ({ user, isLoading, signIn, signUp, signOut, login, register, logout }),
-    [user, isLoading, signIn, signUp, signOut, login, register, logout],
+    () => ({ user, isLoading, signIn, signUp, signOut, login, register, logout, updateUser }),
+    [user, isLoading, signIn, signUp, signOut, login, register, logout, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
