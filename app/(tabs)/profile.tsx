@@ -169,6 +169,12 @@ export default function ProfileScreen() {
 
         <Text style={styles.headerName}>{displayName}</Text>
         <Text style={styles.headerEmail}>{(isEditing ? draft.email : profile.email) || user?.email}</Text>
+        {user?.role === 'ADMIN' ? (
+          <View style={styles.adminRolePill}>
+            <Ionicons name="shield-checkmark" size={12} color="#000" />
+            <Text style={styles.adminRolePillText}>ADMINISTRADOR</Text>
+          </View>
+        ) : null}
 
         <View style={styles.avatarButtonsRow}>
           <Pressable
@@ -342,6 +348,18 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.actionsContainer}>
+            {user?.role === 'ADMIN' ? (
+              <Pressable
+                style={styles.adminPanelButton}
+                onPress={() => router.push('/admin')}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir panel de administración"
+              >
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
+                <Text style={styles.adminPanelButtonText}>Panel de Administrador</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+              </Pressable>
+            ) : null}
             <PrimaryButton title="Editar" onPress={startEditing} />
             <PrimaryButton
               title="Cerrar Sesión"
@@ -558,5 +576,40 @@ const styles = StyleSheet.create({
   actionsContainer: {
     marginTop: 8,
     gap: 12,
+  },
+  adminRolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginTop: 6,
+  },
+  adminRolePillText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  adminPanelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(34, 211, 238, 0.12)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  adminPanelButtonText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });

@@ -16,12 +16,15 @@ function RootNavigator() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAdminRoute = segments[0] === 'admin';
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/login');
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/');
+    } else if (isAuthenticated && inAdminRoute && user?.role !== 'ADMIN') {
+      router.replace('/');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, user?.role]);
 
   if (isLoading) {
     return null;
@@ -32,6 +35,7 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="admin/index" options={{ headerShown: false }} />
         <Stack.Screen name="medication/[id]" options={{ headerShown: true, title: 'Detalle' }} />
         <Stack.Screen name="+not-found" />
       </Stack>

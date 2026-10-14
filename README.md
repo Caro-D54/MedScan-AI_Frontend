@@ -13,7 +13,7 @@ Cliente móvil oficial de **MedScan AI** desarrollado con **React Native** y **E
 
 ## 🛠️ Stack Tecnológico
 
-* **Framework:** [Expo](https://expo.dev/) + React Native 0.76 (versiones exactas en `package.json`).
+* **Framework:** [Expo](https://expo.dev/) SDK 57 + React Native 0.86 + React 19.
 * **Lenguaje:** TypeScript (estricto).
 * **Navegación:** [Expo Router](https://docs.expo.dev/router/introduction/) (file-based routing).
 * **HTTP:** Axios con cliente centralizado (`src/services/apiClient.ts`).
