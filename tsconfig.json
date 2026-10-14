@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "isolatedModules": true,
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["./src/*"]
     }
