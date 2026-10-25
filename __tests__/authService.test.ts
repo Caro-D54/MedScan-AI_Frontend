@@ -113,7 +113,7 @@ describe('authService (TDD)', () => {
           id: 7,
           name: 'Usuario Logueado',
           email: 'logged@medscan.com',
-          role: 'ADMIN',
+          role: 'SYSTEM',
         },
       };
 
@@ -126,7 +126,7 @@ describe('authService (TDD)', () => {
         id: '7',
         name: 'Usuario Logueado',
         email: 'logged@medscan.com',
-        role: 'ADMIN',
+        role: 'SYSTEM',
       });
     });
   });

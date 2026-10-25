@@ -35,7 +35,7 @@ export default function AdminDashboardScreen() {
 
   // Redirección si el usuario no es ADMIN
   useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
+    if (user && user.role !== 'SYSTEM') {
       Alert.alert('Acceso Denegado', 'Esta sección requiere permisos de Administrador.');
       router.replace('/');
     }
@@ -152,7 +152,7 @@ export default function AdminDashboardScreen() {
           <Text style={styles.headerTitle}>Panel de Administrador</Text>
           <View style={styles.adminBadge}>
             <Ionicons name="shield-checkmark" size={12} color="#000" />
-            <Text style={styles.adminBadgeText}>ADMIN</Text>
+            <Text style={styles.adminBadgeText}>SYSTEM</Text>
           </View>
         </View>
         <Pressable
@@ -274,7 +274,7 @@ export default function AdminDashboardScreen() {
           <View style={styles.userList}>
             {usersResponse.content.map((u) => {
               const isCurrentUser = String(user?.id) === String(u.id);
-              const isAdmin = u.role === 'ADMIN';
+              const isAdmin = u.role === 'SYSTEM';
 
               return (
                 <View key={u.id} style={styles.userCard}>
@@ -293,7 +293,7 @@ export default function AdminDashboardScreen() {
                             isAdmin ? styles.roleBadgeTextAdmin : styles.roleBadgeTextUser,
                           ]}
                         >
-                          {isAdmin ? 'ADMIN' : 'USUARIO'}
+                          {isAdmin ? 'SYSTEM' : 'USUARIO'}
                         </Text>
                       </View>
                       {isCurrentUser ? (

@@ -169,7 +169,7 @@ export default function ProfileScreen() {
 
         <Text style={styles.headerName}>{displayName}</Text>
         <Text style={styles.headerEmail}>{(isEditing ? draft.email : profile.email) || user?.email}</Text>
-        {user?.role === 'ADMIN' ? (
+        {user?.role === 'SYSTEM' ? (
           <View style={styles.adminRolePill}>
             <Ionicons name="shield-checkmark" size={12} color="#000" />
             <Text style={styles.adminRolePillText}>ADMINISTRADOR</Text>
@@ -348,7 +348,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.actionsContainer}>
-            {user?.role === 'ADMIN' ? (
+            {user?.role === 'SYSTEM' ? (
               <Pressable
                 style={styles.adminPanelButton}
                 onPress={() => router.push('/admin')}

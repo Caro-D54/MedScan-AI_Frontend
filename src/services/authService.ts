@@ -11,7 +11,7 @@ interface BackendUser {
   id: string | number;
   name: string;
   email: string;
-  role?: 'ADMIN' | 'USER';
+  role?: 'SYSTEM' | 'USER';
 }
 
 interface AuthResponse {

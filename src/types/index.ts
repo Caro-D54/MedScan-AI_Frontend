@@ -38,7 +38,7 @@ export interface Treatment {
   active: boolean;
 }
 
-export type Role = 'ADMIN' | 'USER';
+export type Role = 'SYSTEM' | 'USER';
 
 export interface User {
   id: string;

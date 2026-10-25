@@ -16,12 +16,12 @@ function RootNavigator() {
     }
 
     const inAuthGroup = segments[0] === '(auth)';
-    const inAdminRoute = segments[0] === 'admin';
+    const inAdminRoute = segments[0] === 'SYSTEM';
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/login');
     } else if (isAuthenticated && inAuthGroup) {
       router.replace('/');
-    } else if (isAuthenticated && inAdminRoute && user?.role !== 'ADMIN') {
+    } else if (isAuthenticated && inAdminRoute && user?.role !== 'SYSTEM') {
       router.replace('/');
     }
   }, [isAuthenticated, isLoading, segments, user?.role]);

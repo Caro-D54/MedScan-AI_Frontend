@@ -52,7 +52,7 @@ describe('adminService (TDD)', () => {
         data: {
           content: [
             { id: '1', name: 'Paciente Uno', email: 'uno@test.com', role: 'USER' },
-            { id: '2', name: 'Admin Dos', email: 'admin@test.com', role: 'ADMIN' },
+            { id: '2', name: 'Admin Dos', email: 'admin@test.com', role: 'SYSTEM' },
           ],
           page: {
             totalElements: 2,
