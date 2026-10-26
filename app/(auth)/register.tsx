@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Text, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Link, router } from 'expo-router';
 import { FormTextInput } from '@/components/FormTextInput';
+import { MedScanBrand } from '@/components/MedScanBrand';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useAuth } from '@/hooks/useAuth';
 import { validateRegisterForm } from '@/utils/validation';
@@ -34,8 +35,16 @@ export default function RegisterScreen() {
     try {
       await signUp({ name, email, password, confirmPassword });
       router.replace('/');
-    } catch {
-      Alert.alert('Error', 'No se pudo crear la cuenta. Intentá nuevamente.');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: unknown; message?: string };
+      if (!axiosError.response) {
+        Alert.alert(
+          'Error de conexión',
+          'No se pudo conectar con el servidor. Verificá que el backend esté encendido y que la IP en .env coincida con la de tu PC en la red Wi-Fi.',
+        );
+      } else {
+        Alert.alert('Error', 'No se pudo crear la cuenta. Intentá nuevamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -47,6 +56,7 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <MedScanBrand subtitle="Creá tu cuenta para gestionar tus medicamentos" size="compact" />
         <Text style={styles.title}>Crear Cuenta</Text>
 
         <FormTextInput
@@ -102,9 +112,9 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 16,
     color: colors.textPrimary,
   },
   footer: {

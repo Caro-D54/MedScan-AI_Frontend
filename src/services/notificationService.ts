@@ -41,14 +41,17 @@ export async function setupDoseReminderCategory(): Promise<void> {
     return;
   }
 
-  await ensureAndroidChannel();
-
-  await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY_ID, [
-    {
-      identifier: MARK_TAKEN_ACTION_IDENTIFIER,
-      buttonTitle: 'Marcar tomada',
-    },
-  ]);
+  try {
+    await ensureAndroidChannel();
+    await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY_ID, [
+      {
+        identifier: MARK_TAKEN_ACTION_IDENTIFIER,
+        buttonTitle: 'Marcar tomada',
+      },
+    ]);
+  } catch (error) {
+    console.warn('[notificationService] Error setting up notification category:', error);
+  }
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -182,10 +185,16 @@ async function ensureAndroidChannel(): Promise<void> {
     return;
   }
 
-  await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
-    name: 'Recordatorios de tomas',
-    importance: Notifications.AndroidImportance.MAX,
-  });
+  try {
+    await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+      name: 'Recordatorios de tomas',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  } catch (error) {
+    console.warn('[notificationService] Error configuring Android channel (safe in Expo Go):', error);
+  }
 }
 
 async function storeSchedule(medicationId: string, schedule: StoredSchedule): Promise<void> {

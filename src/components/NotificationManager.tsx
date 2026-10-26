@@ -31,7 +31,9 @@ export function NotificationManager() {
 
   useEffect(() => {
     configureNotifications();
-    void setupDoseReminderCategory();
+    void setupDoseReminderCategory().catch((error) => {
+      console.warn('[NotificationManager] setupDoseReminderCategory error:', error);
+    });
 
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       void handleResponse(response);

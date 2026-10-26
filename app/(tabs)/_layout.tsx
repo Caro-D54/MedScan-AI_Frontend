@@ -8,6 +8,8 @@ import { colors } from '@/theme';
 
 export default function TabLayout() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'SYSTEM';
+
   const [avatarUri, setAvatarUri] = useState<string | null>(
     () => user?.avatarUri ?? getProfileSync(user).avatarUri,
   );
@@ -36,22 +38,26 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          title: isAdmin ? 'Usuarios' : 'Inicio',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name={isAdmin ? 'people' : 'home'} size={size} color={String(color)} />
+          ),
         }}
       />
       <Tabs.Screen
         name="medications"
         options={{
+          href: isAdmin ? null : '/medications',
           title: 'Medicamentos',
-          tabBarIcon: ({ color, size }) => <Ionicons name="medical" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="medical" size={size} color={String(color)} />,
         }}
       />
       <Tabs.Screen
         name="scan"
         options={{
+          href: isAdmin ? null : '/scan',
           title: 'Escáner',
-          tabBarIcon: ({ color, size }) => <Ionicons name="camera" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="camera" size={size} color={String(color)} />,
         }}
       />
       <Tabs.Screen
@@ -68,12 +74,12 @@ export default function TabLayout() {
                     width: size + 2,
                     height: size + 2,
                     borderRadius: (size + 2) / 2,
-                    borderColor: color,
+                    borderColor: String(color),
                   },
                 ]}
               />
             ) : (
-              <Ionicons name="person" size={size} color={color} />
+              <Ionicons name="person" size={size} color={String(color)} />
             ),
         }}
       />

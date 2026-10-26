@@ -5,11 +5,12 @@ export interface AdminMetrics {
   totalUsers: number;
   regularUsers: number;
   adminUsers: number;
+  loggedInUsers?: number;
   newUsersLast7Days: number;
   newUsersLast30Days: number;
-  totalMedications: number;
-  totalTreatments: number;
-  totalDoses: number;
+  totalMedications?: number;
+  totalTreatments?: number;
+  totalDoses?: number;
   uptimeSeconds: number;
 }
 
@@ -36,16 +37,20 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
 }
 
 /**
- * Lista los usuarios registrados con soporte para paginación y búsqueda (exclusivo para ADMIN).
+ * Lista los usuarios registrados con soporte para paginación, búsqueda y filtro de logeados (exclusivo para ADMIN).
  */
 export async function getAdminUsers(
   page: number = 0,
   size: number = 20,
-  search?: string
+  search?: string,
+  loggedInOnly?: boolean
 ): Promise<PagedUsersResponse> {
-  const params: Record<string, string | number> = { page, size };
+  const params: Record<string, string | number | boolean> = { page, size };
   if (search && search.trim()) {
     params.search = search.trim();
+  }
+  if (loggedInOnly) {
+    params.loggedIn = true;
   }
 
   const response = await apiClient.get<PagedUsersResponse>('/admin/users', { params });

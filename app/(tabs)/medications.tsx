@@ -11,12 +11,18 @@ import { colors } from '@/theme';
 
 export default function MedicationsScreen() {
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.role === 'SYSTEM') {
+      router.replace('/');
+    }
+  }, [user]);
   const { medications, isLoading, isRefreshing, refresh } = useMedications();
   const [query, setQuery] = useState('');
   const [profileSnapshot, setProfileSnapshot] = useState(() => getProfileSync(user));
 
   useEffect(() => {
-    setProfileSnapshot(getProfileSync(user));
+
     const unsubscribe = subscribeProfileChanges((updated) => {
       setProfileSnapshot(updated);
     });

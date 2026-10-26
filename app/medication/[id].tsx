@@ -15,6 +15,7 @@ import { MedicationReviewForm } from '@/components/MedicationReviewForm';
 import { ReminderControls } from '@/components/ReminderControls';
 import { getMedication, updateMedication, deleteMedication } from '@/services/medicationService';
 import { cancelMedicationReminders } from '@/services/notificationService';
+import { useAuth } from '@/hooks/useAuth';
 import { useMedicationReminder } from '@/hooks/useMedicationReminder';
 import { validateMedicationDraft } from '@/utils/medication';
 import type { Medication } from '@/types';
@@ -22,6 +23,14 @@ import type { MedicationDraft, MedicationField } from '@/types/medication';
 import { colors } from '@/theme';
 
 export default function MedicationDetailScreen() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.role === 'SYSTEM') {
+      router.replace('/');
+    }
+  }, [user]);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [medication, setMedication] = useState<Medication | null>(null);
   const [draft, setDraft] = useState<MedicationDraft | null>(null);

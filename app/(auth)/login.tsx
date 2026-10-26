@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, KeyboardAvoidingView, Platform, StyleSheet, Alert } from 'react-native';
 import { Link, router } from 'expo-router';
 import { FormTextInput } from '@/components/FormTextInput';
+import { MedScanBrand } from '@/components/MedScanBrand';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { useAuth } from '@/hooks/useAuth';
 import { validateLoginForm } from '@/utils/validation';
@@ -32,8 +33,16 @@ export default function LoginScreen() {
     try {
       await signIn({ email, password });
       router.replace('/');
-    } catch {
-      Alert.alert('Error', 'No se pudo iniciar sesión. Verificá tus credenciales.');
+    } catch (err: unknown) {
+      const axiosError = err as { response?: unknown; message?: string };
+      if (!axiosError.response) {
+        Alert.alert(
+          'Error de conexión',
+          'No se pudo conectar con el servidor. Verificá que el backend esté encendido y que la IP en .env coincida con la de tu PC en la red Wi-Fi.',
+        );
+      } else {
+        Alert.alert('Error', 'No se pudo iniciar sesión. Verificá tus credenciales.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -45,6 +54,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.container}>
+        <MedScanBrand subtitle="Tu asistente de medicación inteligente" />
         <Text style={styles.title}>Iniciar Sesión</Text>
 
         <FormTextInput
@@ -85,9 +95,9 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 16,
     color: colors.textPrimary,
   },
   footer: {

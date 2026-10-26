@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import {
   View,
   Text,
@@ -33,6 +34,15 @@ const EMPTY_DRAFT: MedicationDraft = {
 };
 
 export default function ScanScreen() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.role === 'SYSTEM') {
+      Alert.alert('Acceso no permitido', 'La cuenta de administrador no utiliza la función de escáner.');
+      router.replace('/');
+    }
+  }, [user]);
+
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoFileName, setPhotoFileName] = useState<string | null>(null);

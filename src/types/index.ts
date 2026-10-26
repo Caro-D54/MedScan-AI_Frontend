@@ -1,30 +1,19 @@
+export type MedicationCategory = 'daily' | 'occasional';
+
 export interface Medication {
   id: string;
   name: string;
-  activeIngredient?: string;
   dosage: string;
   frequency: string;
   instructions: string;
-  dose?: string;
+  category: MedicationCategory;
+  activeIngredient?: string;
+  createdAt: string;
   doseId?: string;
   doseTaken?: boolean;
-  nextDose?: string;
-  nextDoseTime?: string;
-  status?: string;
-  type?: string;
-  duration?: string;
-  description?: string;
-  interaction?: string;
-  interactionDetail?: string;
-  withFood?: boolean;
-  withWater?: boolean;
-  avoidAlcohol?: boolean;
-  notes?: string;
-  remaining?: number | string;
 }
 
-
-export interface DoseRecord {
+export interface MedicationEvent {
   id: string;
   medicationId: string;
   takenAt: string;
@@ -46,4 +35,7 @@ export interface User {
   email: string;
   role: Role;
   avatarUri?: string | null;
+  createdAt?: string;
+  lastLoginAt?: string;
+  isLoggedIn?: boolean;
 }
