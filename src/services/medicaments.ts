@@ -143,8 +143,9 @@ export async function getMedications(targetDate: Date = new Date()): Promise<Med
 
     const treatments = await ensureTreatmentsForMedications(meds, rawTreatments);
 
-    // Mapeo por medicamento de dosis pendientes del día
+    // Mapeo por medicamento de dosis pendientes del día y dosis tomadas del día
     const pendingDosesTodayByMedId = new Map<string, DoseResponse[]>();
+    const takenDosesTodayByMedId = new Map<string, DoseResponse[]>();
 
     for (const treatment of treatments) {
       const medId = treatment.medicationId != null ? String(treatment.medicationId) : null;
@@ -158,10 +159,19 @@ export async function getMedications(targetDate: Date = new Date()): Promise<Med
         .filter((d) => d.status === 'PENDING')
         .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
+      const takenToday = dayDoses
+        .filter((d) => d.status === 'TAKEN')
+        .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+
       if (!pendingDosesTodayByMedId.has(medId)) {
         pendingDosesTodayByMedId.set(medId, []);
       }
       pendingDosesTodayByMedId.get(medId)!.push(...pendingToday);
+
+      if (!takenDosesTodayByMedId.has(medId)) {
+        takenDosesTodayByMedId.set(medId, []);
+      }
+      takenDosesTodayByMedId.get(medId)!.push(...takenToday);
     }
 
     return meds.map((item) => {
@@ -169,7 +179,11 @@ export async function getMedications(targetDate: Date = new Date()): Promise<Med
       const pendingList = (pendingDosesTodayByMedId.get(stringId) ?? []).sort(
         (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime(),
       );
+      const takenList = (takenDosesTodayByMedId.get(stringId) ?? []).sort(
+        (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
+      );
       const nextPendingDose = pendingList[0];
+      const lastTakenDose = takenList[0];
 
       // Si tiene dosis pendientes en el día, aún NO está tomada (doseTaken = false).
       // Si no tiene ninguna dosis pendiente hoy (todas las del día fueron tomadas), está al día (doseTaken = true).
@@ -182,7 +196,8 @@ export async function getMedications(targetDate: Date = new Date()): Promise<Med
         dose: item.dosage,
         notes: item.instructions ?? '',
         withFood: item.withFood ?? false,
-        doseId: nextPendingDose ? String(nextPendingDose.id) : undefined,
+        doseId: nextPendingDose ? String(nextPendingDose.id) : (lastTakenDose ? String(lastTakenDose.id) : undefined),
+        lastTakenDoseId: lastTakenDose ? String(lastTakenDose.id) : undefined,
         doseTaken: isTaken,
         nextDose: nextPendingDose ? formatTimeFromIso(nextPendingDose.scheduledAt) : undefined,
       };

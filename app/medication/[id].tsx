@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Pressable,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,6 +167,26 @@ export default function MedicationDetailScreen() {
     });
   }
 
+  async function handleUndoTaken(): Promise<void> {
+    setFeedback(null);
+    const succeeded = await reminder.undoTaken();
+    if (succeeded) {
+      setMedication((prev) => (prev ? { ...prev, doseTaken: false } : prev));
+      setFeedback({
+        type: 'success',
+        text: 'Toma anulada correctamente. La dosis vuelve a estar pendiente.',
+      });
+      void loadMedication();
+      return;
+    }
+
+    Alert.alert('Error', 'No se pudo anular la toma.');
+    setFeedback({
+      type: 'error',
+      text: 'No se pudo anular la toma. Intentá nuevamente.',
+    });
+  }
+
   async function removeMedication(): Promise<void> {
     if (!id) {
       return;
@@ -268,6 +289,25 @@ export default function MedicationDetailScreen() {
               : `Horario programado: ${medication.nextDose ?? 'Pendiente de toma'}`}
           </Text>
         </View>
+
+        {medication.doseTaken ? (
+          <Pressable
+            style={styles.undoStatusButton}
+            onPress={() => void handleUndoTaken()}
+            disabled={reminder.isUndoing}
+            accessibilityRole="button"
+            accessibilityLabel="Anular toma de este medicamento"
+          >
+            {reminder.isUndoing ? (
+              <ActivityIndicator size="small" color={colors.amber} />
+            ) : (
+              <>
+                <Ionicons name="arrow-undo" size={14} color={colors.amber} />
+                <Text style={styles.undoStatusButtonText}>Anular toma</Text>
+              </>
+            )}
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.detailCard}>
@@ -288,11 +328,20 @@ export default function MedicationDetailScreen() {
       </View>
 
       <View style={styles.actions}>
-        <PrimaryButton
-          title="Marcar como tomada"
-          onPress={() => void handleMarkTaken()}
-          isLoading={reminder.isMarkingTaken}
-        />
+        {medication.doseTaken ? (
+          <PrimaryButton
+            title="Anular toma"
+            variant="secondary"
+            onPress={() => void handleUndoTaken()}
+            isLoading={reminder.isUndoing}
+          />
+        ) : (
+          <PrimaryButton
+            title="Marcar como tomada"
+            onPress={() => void handleMarkTaken()}
+            isLoading={reminder.isMarkingTaken}
+          />
+        )}
         <PrimaryButton title="Editar" onPress={startEditing} />
         <PrimaryButton
           title="Eliminar"
@@ -449,6 +498,22 @@ const styles = StyleSheet.create({
   doseStatusSubtitle: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  undoStatusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+  },
+  undoStatusButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.amber,
   },
   detailCard: {
     borderWidth: 1,

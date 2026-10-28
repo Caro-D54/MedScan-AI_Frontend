@@ -14,10 +14,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
 import { getMedications, getPendingDoses } from "../services/medicationService";
-import { markMedicationTakenState, subscribeMedicationChanges } from "../services/medicationEvents";
+import {
+  markMedicationTakenState,
+  clearMedicationTakenState,
+  subscribeMedicationChanges,
+} from "../services/medicationEvents";
 import { getProfileSync, subscribeProfileChanges } from "../services/profileService";
-import { markDoseTaken } from "../services/treatmentService";
-import { formatDayHeader, isToday } from "@/utils/date";
+import { getTreatments, markDoseTaken } from "../services/treatmentService";
+import { formatDayHeader, isSameCalendarDay, isToday } from "@/utils/date";
 import type { Medication, PendingDose } from "@/types";
 
 export interface DashboardScreenProps {
@@ -35,6 +39,7 @@ export function DashboardScreen({ onOpenDetail, userName, avatarUri }: Dashboard
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [takingIds, setTakingIds] = useState<Set<string>>(() => new Set());
   const [takenIds, setTakenIds] = useState<Set<string>>(() => new Set());
+  const [undoingMedIds, setUndoingMedIds] = useState<Set<string>>(() => new Set());
   const [profileSnapshot, setProfileSnapshot] = useState(() => getProfileSync(null));
 
   const displayName = userName?.trim() || profileSnapshot.name?.trim() || "Usuario";
@@ -147,6 +152,50 @@ export function DashboardScreen({ onOpenDetail, userName, avatarUri }: Dashboard
       }
     },
     [takingIds, selectedDate, loadData],
+  );
+
+  const handleUndoDose = useCallback(
+    async (med: Medication): Promise<void> => {
+      if (!med.id || undoingMedIds.has(med.id)) {
+        return;
+      }
+
+      setUndoingMedIds((prev) => new Set(prev).add(med.id));
+
+      try {
+        let targetDoseId = med.lastTakenDoseId || (med.doseTaken ? med.doseId : undefined);
+
+        if (!targetDoseId) {
+          const treatments = await getTreatments(true);
+          for (const t of treatments) {
+            if (String(t.medicationId) === String(med.id)) {
+              const takenToday = (t.doses ?? [])
+                .filter((d) => d.status === "TAKEN" && isSameCalendarDay(d.scheduledAt, selectedDate))
+                .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+              if (takenToday.length > 0) {
+                targetDoseId = String(takenToday[0].id);
+                break;
+              }
+            }
+          }
+        }
+
+        if (targetDoseId) {
+          await markDoseTaken(targetDoseId, "PENDING");
+        }
+        clearMedicationTakenState(med.id);
+        void loadData(false, selectedDate);
+      } catch {
+        Alert.alert("Error", "No se pudo anular la toma.");
+      } finally {
+        setUndoingMedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(med.id);
+          return next;
+        });
+      }
+    },
+    [undoingMedIds, selectedDate, loadData],
   );
 
   if (loading) {
@@ -358,7 +407,13 @@ export function DashboardScreen({ onOpenDetail, userName, avatarUri }: Dashboard
         ) : (
           <View style={styles.list}>
             {meds.map((med) => (
-              <MedCard key={med.id} med={med} onPress={() => onOpenDetail?.(med)} />
+              <MedCard
+                key={med.id}
+                med={med}
+                onPress={() => onOpenDetail?.(med)}
+                onUndo={handleUndoDose}
+                isUndoing={undoingMedIds.has(med.id)}
+              />
             ))}
           </View>
         )}
@@ -382,57 +437,92 @@ const Section = React.memo(function Section({
   );
 });
 
+interface MedCardProps {
+  med: Medication;
+  onPress: () => void;
+  onUndo?: (med: Medication) => void;
+  isUndoing?: boolean;
+}
+
 const MedCard = React.memo(function MedCard({
   med,
   onPress,
-}: {
-  med: Medication;
-  onPress: () => void;
-}) {
+  onUndo,
+  isUndoing,
+}: MedCardProps) {
   const isTaken = Boolean(med.doseTaken);
 
   return (
-    <Pressable
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.medCard,
         isTaken ? styles.medCardTaken : styles.medCardPending,
-        pressed && styles.medCardPressed,
       ]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Ver detalle de ${med.name}`}
     >
-      <View style={styles.medCardHeader}>
-        <View style={styles.medCardTitleRow}>
-          <Text style={styles.medCardName}>{med.name}</Text>
-          {med.dosage ? <Text style={styles.medCardDosage}>{med.dosage}</Text> : null}
+      <Pressable
+        style={({ pressed }) => [
+          styles.medCardMainPressable,
+          pressed && styles.medCardPressed,
+        ]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`Ver detalle de ${med.name}`}
+      >
+        <View style={styles.medCardHeader}>
+          <View style={styles.medCardTitleRow}>
+            <Text style={styles.medCardName}>{med.name}</Text>
+            {med.dosage ? <Text style={styles.medCardDosage}>{med.dosage}</Text> : null}
+          </View>
+
+          {isTaken ? (
+            <View style={styles.takenBadgeSmall}>
+              <CheckCircleIcon size={12} color={colors.success} />
+              <Text style={styles.takenBadgeSmallText}>Al día</Text>
+            </View>
+          ) : (
+            <View style={styles.pendingBadgeSmall}>
+              <ClockIcon size={11} color={colors.danger} />
+              <Text style={styles.pendingBadgeSmallText}>
+                {med.nextDose ? `Pendiente · ${med.nextDose}` : "Pendiente"}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {isTaken ? (
-          <View style={styles.takenBadgeSmall}>
-            <CheckCircleIcon size={12} color={colors.success} />
-            <Text style={styles.takenBadgeSmallText}>Al día</Text>
-          </View>
-        ) : (
-          <View style={styles.pendingBadgeSmall}>
-            <ClockIcon size={11} color={colors.danger} />
-            <Text style={styles.pendingBadgeSmallText}>
-              {med.nextDose ? `Pendiente · ${med.nextDose}` : "Pendiente"}
-            </Text>
-          </View>
-        )}
-      </View>
+        {med.frequency ? (
+          <Text style={styles.medCardFrequency}>Frecuencia: {med.frequency}</Text>
+        ) : null}
 
-      {med.frequency ? (
-        <Text style={styles.medCardFrequency}>Frecuencia: {med.frequency}</Text>
-      ) : null}
+        {med.instructions ? (
+          <Text style={styles.medCardDesc} numberOfLines={2}>
+            {med.instructions}
+          </Text>
+        ) : null}
+      </Pressable>
 
-      {med.instructions ? (
-        <Text style={styles.medCardDesc} numberOfLines={2}>
-          {med.instructions}
-        </Text>
+      {/* Botón de anular toma: SOLO si está marcado como tomada (verde), oculto si está pendiente (rojo) */}
+      {isTaken ? (
+        <View style={styles.medCardFooter}>
+          <Pressable
+            style={styles.undoPillButton}
+            onPress={() => onUndo?.(med)}
+            disabled={isUndoing}
+            accessibilityRole="button"
+            accessibilityLabel={`Anular toma de ${med.name}`}
+            hitSlop={6}
+          >
+            {isUndoing ? (
+              <ActivityIndicator size="small" color={colors.amber} />
+            ) : (
+              <>
+                <Ionicons name="arrow-undo" size={12} color={colors.amber} />
+                <Text style={styles.undoPillText}>Anular toma</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       ) : null}
-    </Pressable>
+    </View>
   );
 });
 
@@ -685,16 +775,19 @@ const styles = StyleSheet.create({
   /* Lista de Medicamentos */
   list: { gap: spacing.sm },
   medCard: {
-    padding: spacing.md,
     borderRadius: radius.lg,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
+    overflow: "hidden",
   },
   medCardPending: {
     borderColor: colors.dangerBorder,
   },
   medCardTaken: {
     borderColor: colors.successBorder,
+  },
+  medCardMainPressable: {
+    padding: spacing.md,
   },
   medCardPressed: { backgroundColor: colors.bgCardHover },
   medCardHeader: {
@@ -718,6 +811,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   medCardDesc: { fontFamily: fonts.body, fontSize: 12, color: colors.textSecondary, marginTop: 4 },
+
+  medCardFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(52, 211, 153, 0.15)",
+  },
+
+  undoPillButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(245, 158, 11, 0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.4)",
+  },
+  undoPillText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.amber,
+  },
 
   pendingBadgeSmall: {
     flexDirection: "row",

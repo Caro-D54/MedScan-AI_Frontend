@@ -7,16 +7,17 @@ import {
   requestNotificationPermission,
 } from '@/services/notificationService';
 import { markDoseAsTaken } from '@/services/medicationService';
-import { markMedicationTakenState } from '@/services/medicationEvents';
-import { createTreatment, getTreatments } from '@/services/treatmentService';
+import { markMedicationTakenState, clearMedicationTakenState } from '@/services/medicationEvents';
+import { createTreatment, getTreatments, markDoseTaken } from '@/services/treatmentService';
 import { parseFrequencyToHours } from '@/utils/frequency';
+import { isSameCalendarDay } from '@/utils/date';
 
 export type ToggleResult =
   | { ok: true }
   | { ok: false; reason: 'permission' | 'unparseable' | 'error' };
 
 async function resolveOrCreatePendingDoseId(medication: Medication): Promise<string | null> {
-  if (medication.doseId) {
+  if (medication.doseId && !medication.doseTaken) {
     return medication.doseId;
   }
 
@@ -64,6 +65,33 @@ async function resolveOrCreatePendingDoseId(medication: Medication): Promise<str
   return null;
 }
 
+async function resolveTakenDoseId(medication: Medication): Promise<string | null> {
+  if (medication.lastTakenDoseId) {
+    return medication.lastTakenDoseId;
+  }
+  if (medication.doseId && medication.doseTaken) {
+    return medication.doseId;
+  }
+
+  try {
+    const treatments = await getTreatments(true);
+    for (const treatment of treatments) {
+      if (String(treatment.medicationId) === String(medication.id)) {
+        const takenDoses = (treatment.doses ?? [])
+          .filter((d) => d.status === 'TAKEN' && isSameCalendarDay(d.scheduledAt, new Date()))
+          .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+        if (takenDoses.length > 0) {
+          return String(takenDoses[0].id);
+        }
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 /**
  * Hook para gestionar los recordatorios y tomas de un medicamento específico.
  */
@@ -71,6 +99,7 @@ export function useMedicationReminder(medication: Medication | null) {
   const [scheduledHours, setScheduledHours] = useState<number[] | null>(null);
   const [isToggling, setIsToggling] = useState(false);
   const [isMarkingTaken, setIsMarkingTaken] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   const canSchedule = Boolean(
     medication && parseFrequencyToHours(medication.frequency) !== null,
@@ -142,13 +171,35 @@ export function useMedicationReminder(medication: Medication | null) {
     }
   }, [medication]);
 
+  const undoTaken = useCallback(async (): Promise<boolean> => {
+    if (!medication) {
+      return false;
+    }
+    setIsUndoing(true);
+    try {
+      const doseId = await resolveTakenDoseId(medication);
+      if (doseId) {
+        await markDoseTaken(doseId, 'PENDING');
+      }
+      clearMedicationTakenState(medication.id);
+      return true;
+    } catch {
+      clearMedicationTakenState(medication.id);
+      return true;
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [medication]);
+
   return {
     isEnabled: (scheduledHours?.length ?? 0) > 0,
     scheduledHours,
     canSchedule,
     isToggling,
     isMarkingTaken,
+    isUndoing,
     toggle,
     markTaken,
+    undoTaken,
   };
 }

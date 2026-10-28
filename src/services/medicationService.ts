@@ -118,12 +118,18 @@ export async function getMedication(id: string): Promise<Medication> {
     .filter((d) => d.status === 'PENDING')
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 
+  const takenToday = todayDoses
+    .filter((d) => d.status === 'TAKEN')
+    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+
   const hasPending = pendingToday.length > 0;
   const nextPending = pendingToday[0];
+  const lastTaken = takenToday[0];
 
   return {
     ...raw,
-    doseId: nextPending ? String(nextPending.id) : undefined,
+    doseId: nextPending ? String(nextPending.id) : (lastTaken ? String(lastTaken.id) : undefined),
+    lastTakenDoseId: lastTaken ? String(lastTaken.id) : undefined,
     doseTaken: !hasPending,
     nextDose: nextPending ? formatTimeFromIso(nextPending.scheduledAt) : undefined,
   };

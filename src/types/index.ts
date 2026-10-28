@@ -10,6 +10,7 @@ export interface Medication {
   activeIngredient?: string;
   createdAt?: string;
   doseId?: string;
+  lastTakenDoseId?: string;
   doseTaken?: boolean;
   nextDose?: string;
   dose?: string;
