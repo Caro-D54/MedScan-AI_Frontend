@@ -10,13 +10,15 @@ import {
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, fonts, radius, spacing } from "../theme/theme";
 import { BellIcon, CheckCircleIcon, ClockIcon, PillIcon } from "../icons/icons";
-import { getMedications } from "../services/medicationService";
+import { getMedications, getPendingDoses } from "../services/medicationService";
 import { markMedicationTakenState, subscribeMedicationChanges } from "../services/medicationEvents";
 import { getProfileSync, subscribeProfileChanges } from "../services/profileService";
 import { markDoseTaken } from "../services/treatmentService";
-import type { Medication } from "@/types";
+import { formatDayHeader, isToday } from "@/utils/date";
+import type { Medication, PendingDose } from "@/types";
 
 export interface DashboardScreenProps {
   onOpenDetail?: (med: Medication) => void;
@@ -25,78 +27,137 @@ export interface DashboardScreenProps {
 }
 
 export function DashboardScreen({ onOpenDetail, userName, avatarUri }: DashboardScreenProps) {
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [meds, setMeds] = useState<Medication[]>([]);
+  const [pendingDoses, setPendingDoses] = useState<PendingDose[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isTakingDose, setIsTakingDose] = useState(false);
+  const [takingIds, setTakingIds] = useState<Set<string>>(() => new Set());
+  const [takenIds, setTakenIds] = useState<Set<string>>(() => new Set());
   const [profileSnapshot, setProfileSnapshot] = useState(() => getProfileSync(null));
 
-  const displayName = userName?.trim() || profileSnapshot.name?.trim() || "Alex";
-  const initial = displayName.charAt(0).toUpperCase() || "A";
+  const displayName = userName?.trim() || profileSnapshot.name?.trim() || "Usuario";
+  const initial = displayName.charAt(0).toUpperCase() || "U";
   const resolvedAvatarUri = avatarUri ?? profileSnapshot.avatarUri ?? null;
 
-  const loadMedications = useCallback(async (): Promise<void> => {
-    try {
-      const data = await getMedications();
-      setMeds(data);
-      setErrorMsg(null);
-    } catch {
-      setErrorMsg("No se pudo conectar con el backend.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const loadData = useCallback(
+    async (isInitial = false, dateToQuery = selectedDate): Promise<void> => {
+      if (isInitial) {
+        setLoading(true);
+      }
+      try {
+        const [medList, dosesList] = await Promise.all([
+          getMedications(dateToQuery),
+          getPendingDoses(dateToQuery),
+        ]);
+        setMeds(medList);
+        setPendingDoses(dosesList);
+        setErrorMsg(null);
+      } catch {
+        setErrorMsg("No se pudo conectar con el servidor.");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [selectedDate],
+  );
 
   useEffect(() => {
-    void loadMedications();
+    void loadData(true, selectedDate);
+
     const unsubscribeMeds = subscribeMedicationChanges(() => {
-      void loadMedications();
+      void loadData(false, selectedDate);
     });
     const unsubscribeProfile = subscribeProfileChanges((updated) => {
       setProfileSnapshot(updated);
     });
+
     return () => {
       unsubscribeMeds();
       unsubscribeProfile();
     };
-  }, [loadMedications]);
+  }, [loadData, selectedDate]);
 
   const handleRefresh = useCallback((): void => {
     setRefreshing(true);
-    void loadMedications();
-  }, [loadMedications]);
+    void loadData(false, selectedDate);
+  }, [loadData, selectedDate]);
 
-  const handleTakeNow = useCallback(async (): Promise<void> => {
-    const med = meds[0];
-    if (!med) {
-      return;
-    }
-    if (!med.doseId) {
-      Alert.alert("Sin dosis pendiente", "No hay una toma programada para este medicamento.");
-      return;
-    }
-    setIsTakingDose(true);
-    try {
-      await markDoseTaken(med.doseId);
-      markMedicationTakenState(med.id);
-      Alert.alert("Toma registrada", `Registraste la toma de ${med.name}.`);
-      void getMedications().then(setMeds);
-    } catch {
-      Alert.alert("Error", "No se pudo registrar la toma.");
-    } finally {
-      setIsTakingDose(false);
-    }
-  }, [meds]);
+  const handleSelectDate = useCallback(
+    (newDate: Date): void => {
+      setSelectedDate(newDate);
+      void loadData(false, newDate);
+    },
+    [loadData],
+  );
+
+  const handleChangeDay = useCallback(
+    (offset: number): void => {
+      const next = new Date(selectedDate);
+      next.setDate(next.getDate() + offset);
+      handleSelectDate(next);
+    },
+    [selectedDate, handleSelectDate],
+  );
+
+  const handleSelectToday = useCallback((): void => {
+    handleSelectDate(new Date());
+  }, [handleSelectDate]);
+
+  const handleTakeDose = useCallback(
+    async (dose: PendingDose): Promise<void> => {
+      if (!dose.id || takingIds.has(dose.id)) {
+        return;
+      }
+
+      setTakingIds((prev) => new Set(prev).add(dose.id));
+
+      try {
+        await markDoseTaken(dose.id);
+
+        setTakingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(dose.id);
+          return next;
+        });
+
+        // Cambia la tarjeta inmediatamente a VERDE
+        setTakenIds((prev) => new Set(prev).add(dose.id));
+        markMedicationTakenState(dose.medicationId);
+
+        // Permanece en VERDE durante 1.2s y luego DESAPARECE de la lista del día
+        setTimeout(() => {
+          setPendingDoses((prev) => prev.filter((item) => item.id !== dose.id));
+          setTakenIds((prev) => {
+            const next = new Set(prev);
+            next.delete(dose.id);
+            return next;
+          });
+          void loadData(false, selectedDate);
+        }, 1200);
+      } catch {
+        setTakingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(dose.id);
+          return next;
+        });
+        Alert.alert("Error", "No se pudo registrar la toma. Intenta nuevamente.");
+      }
+    },
+    [takingIds, selectedDate, loadData],
+  );
 
   if (loading) {
     return (
       <View style={styles.loadingRoot}>
-        <ActivityIndicator color={colors.teal} />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
+
+  const isCurrentDayToday = isToday(selectedDate);
 
   return (
     <ScrollView
@@ -105,11 +166,12 @@ export function DashboardScreen({ onOpenDetail, userName, avatarUri }: Dashboard
         <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          tintColor={colors.teal}
-          colors={[colors.teal]}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
         />
       }
     >
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
@@ -135,68 +197,183 @@ export function DashboardScreen({ onOpenDetail, userName, avatarUri }: Dashboard
         </View>
       ) : null}
 
-      {meds.length === 0 && !errorMsg ? (
-        <Text style={styles.emptyText}>Todavía no escaneaste ningún medicamento.</Text>
-      ) : null}
+      {/* Sección: Dosis pendientes por día */}
+      <View style={styles.section}>
+        <View style={styles.daySelectorHeader}>
+          <View style={styles.dayTitleBlock}>
+            <Text style={styles.sectionTitle}>Dosis del día</Text>
+            <Text style={styles.selectedDaySubtitle}>{formatDayHeader(selectedDate)}</Text>
+          </View>
 
-      {meds.length > 0 && (
-        <Section title="Próxima dosis">
-          <View style={[styles.nextDoseCard, meds[0].doseTaken && styles.nextDoseCardTaken]}>
-            <View style={styles.nextDoseLeft}>
-              <View style={[styles.iconCircle, meds[0].doseTaken && styles.iconCircleTaken]}>
-                <PillIcon size={16} />
-              </View>
-              <View>
-                <Text style={styles.nextDoseName}>
-                  {meds[0].name} {meds[0].dose}
-                </Text>
-                <View style={styles.nextDoseTimeRow}>
-                  <ClockIcon />
-                  <Text style={styles.nextDoseTime}>{meds[0].nextDose ?? "Sin horario"}</Text>
-                </View>
-              </View>
-            </View>
+          <View style={styles.dayNavControls}>
             <Pressable
-              style={[
-                styles.takeNowButton,
-                meds[0].doseTaken && styles.takeNowButtonTaken,
-                (!meds[0].doseId || isTakingDose) && !meds[0].doseTaken && styles.takeNowButtonDisabled,
-              ]}
+              style={styles.dayNavButton}
+              onPress={() => handleChangeDay(-1)}
               accessibilityRole="button"
-              accessibilityLabel="Tomar ahora"
-              onPress={() => void handleTakeNow()}
-              disabled={isTakingDose || !meds[0].doseId}
+              accessibilityLabel="Día anterior"
+              hitSlop={8}
             >
-              {isTakingDose ? (
-                <ActivityIndicator size="small" color={colors.teal} />
-              ) : meds[0].doseTaken ? (
-                <>
-                  <CheckCircleIcon size={13} color={colors.success} />
-                  <Text style={styles.takeNowTextTaken}>Dosis tomada</Text>
-                </>
-              ) : (
-                <>
-                  <CheckCircleIcon size={13} color={colors.teal} />
-                  <Text style={styles.takeNowText}>Tomar ahora</Text>
-                </>
-              )}
+              <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
+            </Pressable>
+
+            {!isCurrentDayToday ? (
+              <Pressable
+                style={styles.backToTodayButton}
+                onPress={handleSelectToday}
+                accessibilityRole="button"
+                accessibilityLabel="Volver a hoy"
+              >
+                <Text style={styles.backToTodayText}>Hoy</Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={styles.dayNavButton}
+              onPress={() => handleChangeDay(1)}
+              accessibilityRole="button"
+              accessibilityLabel="Día siguiente"
+              hitSlop={8}
+            >
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
-        </Section>
-      )}
-
-      <Section title="Medicamentos">
-        <View style={styles.list}>
-          {meds.map((med) => (
-            <MedCard key={med.id} med={med} onPress={() => onOpenDetail?.(med)} />
-          ))}
         </View>
+
+        {pendingDoses.length > 0 ? (
+          <View style={styles.dosesList}>
+            {pendingDoses.map((dose) => {
+              const isTaken = takenIds.has(dose.id);
+              const isTaking = takingIds.has(dose.id);
+
+              return (
+                <View
+                  key={dose.id}
+                  style={[
+                    styles.doseCard,
+                    isTaken ? styles.doseCardTaken : styles.doseCardPending,
+                  ]}
+                >
+                  <View style={styles.doseCardLeft}>
+                    <View
+                      style={[
+                        styles.iconCircle,
+                        isTaken ? styles.iconCircleTaken : styles.iconCirclePending,
+                      ]}
+                    >
+                      {isTaken ? (
+                        <CheckCircleIcon size={20} color={colors.success} />
+                      ) : (
+                        <PillIcon size={18} color={colors.danger} />
+                      )}
+                    </View>
+
+                    <View style={styles.doseInfo}>
+                      <Text style={styles.doseName}>
+                        {dose.medicationName} {dose.dosage ? `· ${dose.dosage}` : ""}
+                      </Text>
+
+                      <View style={styles.doseTimeRow}>
+                        <ClockIcon
+                          size={13}
+                          color={isTaken ? colors.success : colors.danger}
+                        />
+                        <Text
+                          style={[
+                            styles.doseTimeText,
+                            isTaken ? styles.doseTimeTextTaken : styles.doseTimeTextPending,
+                          ]}
+                        >
+                          {isTaken
+                            ? `¡Dosis tomada! (${dose.scheduledTime})`
+                            : `Horario: ${dose.scheduledTime}`}
+                        </Text>
+                      </View>
+
+                      {!isTaken ? (
+                        <View style={styles.pendingBadge}>
+                          <Text style={styles.pendingBadgeText}>● Pendiente de tomar</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.takenBadge}>
+                          <Text style={styles.takenBadgeText}>✓ Registrada correctamente</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  <Pressable
+                    style={[
+                      styles.takeActionButton,
+                      isTaken ? styles.takeActionButtonTaken : styles.takeActionButtonPending,
+                      isTaking && styles.takeActionButtonDisabled,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tomar dosis de ${dose.medicationName}`}
+                    onPress={() => void handleTakeDose(dose)}
+                    disabled={isTaking || isTaken}
+                  >
+                    {isTaking ? (
+                      <ActivityIndicator size="small" color={colors.danger} />
+                    ) : isTaken ? (
+                      <>
+                        <CheckCircleIcon size={14} color={colors.success} />
+                        <Text style={styles.takeActionTextTaken}>Tomada</Text>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircleIcon size={14} color={colors.danger} />
+                        <Text style={styles.takeActionTextPending}>Tomar ahora</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.allDoneCard}>
+            <View style={styles.allDoneIconCircle}>
+              <CheckCircleIcon size={24} color={colors.success} />
+            </View>
+            <View style={styles.allDoneInfo}>
+              <Text style={styles.allDoneTitle}>
+                {isCurrentDayToday
+                  ? "¡Todas las dosis de hoy tomadas!"
+                  : "Sin dosis pendientes"}
+              </Text>
+              <Text style={styles.allDoneSubtitle}>
+                {isCurrentDayToday
+                  ? "No quedan tomas pendientes para hoy. La lista está al día."
+                  : `No hay tomas pendientes programadas para ${formatDayHeader(selectedDate).toLowerCase()}.`}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Sección: Lista de Medicamentos */}
+      <Section title="Mis medicamentos">
+        {meds.length === 0 ? (
+          <Text style={styles.emptyText}>Todavía no escaneaste ningún medicamento.</Text>
+        ) : (
+          <View style={styles.list}>
+            {meds.map((med) => (
+              <MedCard key={med.id} med={med} onPress={() => onOpenDetail?.(med)} />
+            ))}
+          </View>
+        )}
       </Section>
     </ScrollView>
   );
 }
 
-const Section = React.memo(function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const Section = React.memo(function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -205,58 +382,82 @@ const Section = React.memo(function Section({ title, children }: { title: string
   );
 });
 
-const MedCard = React.memo(function MedCard({ med, onPress }: { med: Medication; onPress: () => void }) {
+const MedCard = React.memo(function MedCard({
+  med,
+  onPress,
+}: {
+  med: Medication;
+  onPress: () => void;
+}) {
+  const isTaken = Boolean(med.doseTaken);
+
   return (
     <Pressable
-      onPress={onPress}
       style={({ pressed }) => [
         styles.medCard,
-        med.doseTaken && styles.medCardTaken,
+        isTaken ? styles.medCardTaken : styles.medCardPending,
         pressed && styles.medCardPressed,
       ]}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Ver detalle de ${med.name}`}
     >
       <View style={styles.medCardHeader}>
-        <Text style={styles.medCardName}>{med.name}</Text>
-        {med.doseTaken ? (
-          <View style={styles.takenBadge}>
+        <View style={styles.medCardTitleRow}>
+          <Text style={styles.medCardName}>{med.name}</Text>
+          {med.dosage ? <Text style={styles.medCardDosage}>{med.dosage}</Text> : null}
+        </View>
+
+        {isTaken ? (
+          <View style={styles.takenBadgeSmall}>
             <CheckCircleIcon size={12} color={colors.success} />
-            <Text style={styles.takenBadgeText}>Dosis tomada</Text>
+            <Text style={styles.takenBadgeSmallText}>Al día</Text>
           </View>
-        ) : med.status === "verified" ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Verificado</Text>
+        ) : (
+          <View style={styles.pendingBadgeSmall}>
+            <ClockIcon size={11} color={colors.danger} />
+            <Text style={styles.pendingBadgeSmallText}>
+              {med.nextDose ? `Pendiente · ${med.nextDose}` : "Pendiente"}
+            </Text>
           </View>
-        ) : null}
+        )}
       </View>
-      {med.description ? <Text style={styles.medCardDesc}>{med.description}</Text> : null}
+
+      {med.frequency ? (
+        <Text style={styles.medCardFrequency}>Frecuencia: {med.frequency}</Text>
+      ) : null}
+
+      {med.instructions ? (
+        <Text style={styles.medCardDesc} numberOfLines={2}>
+          {med.instructions}
+        </Text>
+      ) : null}
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
   loadingRoot: { flex: 1, alignItems: "center", justifyContent: "center" },
-  scroll: { padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  scroll: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxxl },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.teal,
+    backgroundColor: colors.primary,
     overflow: "hidden",
   },
   avatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
-  avatarText: { fontFamily: fonts.displaySemiBold, fontSize: 14, color: colors.bgPrimary },
-  brand: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.textPrimary },
-  greeting: { fontFamily: fonts.body, fontSize: 12, color: colors.textSecondary },
+  avatarText: { fontFamily: fonts.displaySemiBold, fontSize: 16, color: colors.bgPrimary },
+  brand: { fontFamily: fonts.displaySemiBold, fontSize: 17, color: colors.textPrimary },
+  greeting: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary },
   errorBox: {
     borderRadius: radius.md,
     backgroundColor: "rgba(245,158,11,0.1)",
@@ -265,95 +466,287 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   errorText: { fontFamily: fonts.body, fontSize: 12, color: colors.amber },
-  emptyText: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary, textAlign: "center", paddingVertical: spacing.xl },
+  emptyText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: "center",
+    paddingVertical: spacing.xl,
+  },
   section: { gap: spacing.sm },
-  sectionTitle: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.textSecondary },
-  nextDoseCard: {
+  sectionTitle: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.textSecondary,
+    letterSpacing: 0.2,
+  },
+
+  /* Encabezado con selector de día */
+  daySelectorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xs,
+  },
+  dayTitleBlock: {
+    gap: 2,
+  },
+  selectedDaySubtitle: {
+    fontFamily: fonts.displaySemiBold,
+    fontSize: 17,
+    color: colors.textPrimary,
+  },
+  dayNavControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dayNavButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  backToTodayButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(34, 211, 238, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(34, 211, 238, 0.35)",
+  },
+  backToTodayText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.primary,
+  },
+
+  /* Lista de Dosis */
+  dosesList: { gap: spacing.md },
+  doseCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: colors.bgCard,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.5,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
-  nextDoseCardTaken: {
-    borderColor: "rgba(52, 211, 153, 0.35)",
+  // ROJO cuando aún no toma la dosis
+  doseCardPending: {
+    borderColor: colors.dangerBorder,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
   },
-  nextDoseLeft: { flexDirection: "row", alignItems: "center", gap: spacing.md, flexShrink: 1 },
+  // VERDE cuando la marca como tomada
+  doseCardTaken: {
+    borderColor: colors.successBorder,
+    backgroundColor: "rgba(52, 211, 153, 0.12)",
+  },
+  doseCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    flex: 1,
+  },
   iconCircle: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(34,211,238,0.12)",
+  },
+  iconCirclePending: {
+    backgroundColor: "rgba(239, 68, 68, 0.18)",
   },
   iconCircleTaken: {
-    backgroundColor: "rgba(52, 211, 153, 0.15)",
+    backgroundColor: "rgba(52, 211, 153, 0.22)",
   },
-  nextDoseName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textPrimary },
-  nextDoseTimeRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  nextDoseTime: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.teal },
-  takeNowButton: {
+  doseInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  doseName: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  doseTimeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
+  },
+  doseTimeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+  },
+  doseTimeTextPending: {
+    color: colors.danger,
+  },
+  doseTimeTextTaken: {
+    color: colors.success,
+  },
+  pendingBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    marginTop: 2,
+  },
+  pendingBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.danger,
+  },
+  takenBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(52, 211, 153, 0.18)",
+    marginTop: 2,
+  },
+  takenBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.success,
+  },
+
+  /* Botones de acción */
+  takeActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    minHeight: 44,
+    minHeight: 40,
     borderRadius: radius.md,
-    backgroundColor: "rgba(34,211,238,0.12)",
     borderWidth: 1,
-    borderColor: "rgba(34,211,238,0.2)",
   },
-  takeNowButtonTaken: {
-    backgroundColor: "rgba(52, 211, 153, 0.15)",
-    borderColor: "rgba(52, 211, 153, 0.4)",
+  takeActionButtonPending: {
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    borderColor: colors.dangerBorder,
   },
-  takeNowButtonDisabled: {
-    opacity: 0.4,
+  takeActionButtonTaken: {
+    backgroundColor: "rgba(52, 211, 153, 0.2)",
+    borderColor: colors.successBorder,
   },
-  takeNowText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.teal },
-  takeNowTextTaken: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.success },
+  takeActionButtonDisabled: {
+    opacity: 0.6,
+  },
+  takeActionTextPending: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: colors.danger,
+  },
+  takeActionTextTaken: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: colors.success,
+  },
+
+  /* Tarjeta de todas las dosis al día */
+  allDoneCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: "rgba(52, 211, 153, 0.08)",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(52, 211, 153, 0.3)",
+    padding: spacing.lg,
+  },
+  allDoneIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(52, 211, 153, 0.16)",
+  },
+  allDoneInfo: { flex: 1, gap: 2 },
+  allDoneTitle: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 15,
+    color: colors.success,
+  },
+  allDoneSubtitle: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+
+  /* Lista de Medicamentos */
   list: { gap: spacing.sm },
   medCard: {
     padding: spacing.md,
     borderRadius: radius.lg,
     backgroundColor: colors.bgCard,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+  },
+  medCardPending: {
+    borderColor: colors.dangerBorder,
   },
   medCardTaken: {
-    borderColor: "rgba(52, 211, 153, 0.35)",
+    borderColor: colors.successBorder,
   },
   medCardPressed: { backgroundColor: colors.bgCardHover },
-  medCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  medCardName: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textPrimary },
-  medCardDesc: { fontFamily: fonts.body, fontSize: 12, color: colors.textSecondary, marginTop: 4 },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(34,211,238,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(34,211,238,0.2)",
+  medCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
   },
-  badgeText: { fontFamily: fonts.bodySemiBold, fontSize: 10, color: colors.teal },
-  takenBadge: {
+  medCardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexShrink: 1,
+  },
+  medCardName: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textPrimary },
+  medCardDosage: { fontFamily: fonts.body, fontSize: 13, color: colors.textSecondary },
+  medCardFrequency: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 12,
+    color: colors.primary,
+    marginTop: 4,
+  },
+  medCardDesc: { fontFamily: fonts.body, fontSize: 12, color: colors.textSecondary, marginTop: 4 },
+
+  pendingBadgeSmall: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+  },
+  pendingBadgeSmallText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.danger,
+  },
+  takenBadgeSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
     borderRadius: radius.pill,
     backgroundColor: "rgba(52, 211, 153, 0.15)",
     borderWidth: 1,
-    borderColor: "rgba(52, 211, 153, 0.4)",
+    borderColor: colors.successBorder,
   },
-  takenBadgeText: {
+  takenBadgeSmallText: {
     fontFamily: fonts.bodySemiBold,
     fontSize: 11,
     color: colors.success,

@@ -16,7 +16,10 @@ export function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
 
   async function takePhoto(): Promise<void> {
     try {
-      const photo = await cameraRef.current?.takePictureAsync();
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.7,
+        skipProcessing: false,
+      });
       if (photo?.uri) {
         onCapture(photo.uri);
       }

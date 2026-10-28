@@ -6,11 +6,30 @@ export interface Medication {
   dosage: string;
   frequency: string;
   instructions: string;
-  category: MedicationCategory;
+  category?: MedicationCategory;
   activeIngredient?: string;
-  createdAt: string;
+  createdAt?: string;
   doseId?: string;
   doseTaken?: boolean;
+  nextDose?: string;
+  dose?: string;
+  notes?: string;
+  withFood?: boolean;
+  status?: string;
+  description?: string;
+}
+
+export interface PendingDose {
+  id: string;
+  treatmentId?: string;
+  medicationId: string;
+  medicationName: string;
+  dosage?: string;
+  scheduledAt: string;
+  scheduledTime: string;
+  intervalHours?: number;
+  withFood?: boolean;
+  status: 'PENDING' | 'TAKEN';
 }
 
 export interface MedicationEvent {

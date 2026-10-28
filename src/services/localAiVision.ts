@@ -154,6 +154,14 @@ export function extractMedicationFromText(
     .map(cleanLine)
     .filter((line) => line.length >= 3 && line.split(/\s+/).every((w) => w.length >= 2));
 
+  const dosageMatch = (combinedRaw || '').match(/\b(\d+(?:[.,]\d+)?\s*(?:mg|g|mcg|ml))\b/i);
+  const detectedDosage = dosageMatch ? dosageMatch[1].trim() : '';
+
+  const freqMatch = (combinedRaw || '').match(
+    /\b(cada\s+\d+\s+horas?|cada\s+\d+\s+hs|\d+\s*(?:veces|comprimidos?)\s*al\s*d[ií]a|cada\s+d[ií]a|1\s*por\s*d[ií]a)\b/i,
+  );
+  const detectedFrequency = freqMatch ? freqMatch[1].trim() : '';
+
   if (matchedBrand && matchedIngredient) {
     // Si encontramos principio activo genérico como marca pero hay otra línea prominente en la caja, usar esa línea como marca comercial
     if (
@@ -173,8 +181,8 @@ export function extractMedicationFromText(
       medication: matchedBrand,
       name: matchedBrand,
       activeIngredient: matchedIngredient,
-      dosage: '',
-      frequency: '',
+      dosage: detectedDosage,
+      frequency: detectedFrequency,
       instructions: '',
     };
   }
@@ -211,8 +219,8 @@ export function extractMedicationFromText(
     medication: detectedBrand,
     name: detectedBrand,
     activeIngredient: detectedActive,
-    dosage: '',
-    frequency: '',
+    dosage: detectedDosage,
+    frequency: detectedFrequency,
     instructions: '',
   };
 }
@@ -318,6 +326,40 @@ export async function analyzeMedicationImageLocally(
     }
   } catch {
     // Continuar con pistas disponibles si el motor OCR falla
+  }
+
+  // Fallback para entornos móviles (React Native / Expo Go)
+  if (!ocrText) {
+    try {
+      const formData = new FormData();
+      formData.append("apikey", "K88856237488957");
+      formData.append("language", "spa");
+      formData.append("isOverlayRequired", "false");
+      formData.append("scale", "true");
+      formData.append("OCREngine", "2");
+
+      if (photoUri.startsWith("data:")) {
+        formData.append("base64Image", photoUri);
+      } else {
+        const isPng = photoUri.toLowerCase().endsWith(".png");
+        formData.append("file", {
+          uri: photoUri,
+          name: isPng ? "photo.png" : "photo.jpg",
+          type: isPng ? "image/png" : "image/jpeg",
+        } as unknown as Blob);
+      }
+
+      const res = await fetch("https://api.ocr.space/parse/image", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        const json = await res.json();
+        ocrText = json?.ParsedResults?.[0]?.ParsedText ?? "";
+      }
+    } catch {
+      // Ignorar fallo de red puntual
+    }
   }
 
   return extractMedicationFromText(ocrText, fileNameHint);

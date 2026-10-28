@@ -23,6 +23,10 @@ export const colors = {
   background: "#0b1320",
   primary: "#22d3ee",
   danger: "#ef4444",
+  dangerMuted: "rgba(239, 68, 68, 0.12)",
+  dangerBorder: "rgba(239, 68, 68, 0.45)",
+  successMuted: "rgba(52, 211, 153, 0.12)",
+  successBorder: "rgba(52, 211, 153, 0.45)",
 } as const;
 
 /** Cargar con expo-font: Outfit (títulos) e Inter (cuerpo). */

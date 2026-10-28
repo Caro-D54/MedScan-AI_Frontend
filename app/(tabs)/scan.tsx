@@ -120,24 +120,36 @@ export default function ScanScreen() {
 
     const detectedBrand = (result?.brandName || result?.name || '').trim();
     const detectedIngredient = (result?.activeIngredient || '').trim();
+    const detectedDosage = (result?.dosage || '').trim();
+    const detectedFrequency = (result?.frequency || '').trim();
+    const detectedInstructions = (result?.instructions || '').trim();
 
     setIsManualMode(false);
     setErrors({});
     setDraft({
       name: detectedBrand,
       activeIngredient: detectedIngredient,
-      dosage: '',
-      frequency: '',
-      instructions: '',
+      dosage: detectedDosage,
+      frequency: detectedFrequency,
+      instructions: detectedInstructions,
     });
 
-    if (detectedBrand || detectedIngredient) {
+    if (detectedBrand || detectedIngredient || detectedDosage) {
+      const details = [
+        detectedBrand,
+        detectedIngredient,
+        detectedDosage ? `Dosis: ${detectedDosage}` : '',
+        detectedFrequency ? `Frecuencia: ${detectedFrequency}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
       setNoticeMessage(
-        `✨ La IA identificó: ${[detectedBrand, detectedIngredient].filter(Boolean).join(' · ')}. Ahora ingresá la dosis, frecuencia e indicaciones según lo que te indicó el médico.`,
+        `✨ La IA extrajo el texto del medicamento: ${details}. Revisá los datos y confirmá para registrarlo.`,
       );
     } else {
       setNoticeMessage(
-        '✨ Imagen analizada. Verificá o ingresá el nombre comercial y principio activo, y completá la dosis, frecuencia e indicaciones según lo que te indicó el médico.',
+        '✨ Imagen analizada. Podés revisar o completar el nombre comercial, principio activo, dosis e indicaciones.',
       );
     }
 

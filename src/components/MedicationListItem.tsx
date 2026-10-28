@@ -18,16 +18,21 @@ export const MedicationListItem = React.memo(function MedicationListItem({
 
   return (
     <Pressable
-      style={[styles.item, isTaken && styles.itemTaken]}
+      style={[styles.item, isTaken ? styles.itemTaken : styles.itemPending]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Ver detalle de ${medication.name}`}
     >
-      <View style={styles.iconContainer}>
+      <View
+        style={[
+          styles.iconContainer,
+          isTaken ? styles.iconContainerTaken : styles.iconContainerPending,
+        ]}
+      >
         <Ionicons
           name="medical"
-          size={24}
-          color={isTaken ? colors.success : colors.primary}
+          size={22}
+          color={isTaken ? colors.success : colors.danger}
         />
       </View>
 
@@ -36,15 +41,32 @@ export const MedicationListItem = React.memo(function MedicationListItem({
           <Text style={styles.name}>{medication.name}</Text>
           {isTaken ? (
             <View style={styles.takenBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+              <Ionicons name="checkmark-circle" size={13} color={colors.success} />
               <Text style={styles.takenBadgeText}>Dosis tomada</Text>
             </View>
-          ) : null}
+          ) : (
+            <View style={styles.pendingBadge}>
+              <Ionicons name="time" size={12} color={colors.danger} />
+              <Text style={styles.pendingBadgeText}>
+                {medication.nextDose ? `Pendiente · ${medication.nextDose}` : 'Pendiente'}
+              </Text>
+            </View>
+          )}
         </View>
+
         <Text style={styles.meta}>
           {medication.dosage}
           {medication.frequency ? ` · ${medication.frequency}` : ''}
         </Text>
+
+        {!isTaken && medication.nextDose ? (
+          <View style={styles.scheduleRow}>
+            <Ionicons name="alarm-outline" size={13} color={colors.danger} />
+            <Text style={styles.scheduleText}>
+              Horario de toma: {medication.nextDose}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -57,17 +79,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
     marginBottom: 12,
     backgroundColor: colors.background,
   },
+  // ROJO cuando la dosis aún no se toma
+  itemPending: {
+    borderColor: colors.dangerBorder,
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+  },
+  // VERDE cuando la dosis ya fue tomada
   itemTaken: {
-    borderColor: 'rgba(52, 211, 153, 0.35)',
+    borderColor: colors.successBorder,
+    backgroundColor: 'rgba(52, 211, 153, 0.06)',
   },
   iconContainer: {
-    marginRight: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  iconContainerPending: {
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+  },
+  iconContainerTaken: {
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
   },
   details: {
     flex: 1,
@@ -77,12 +116,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    marginRight: 8,
+    marginRight: 6,
   },
   name: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+  },
+  pendingBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.danger,
   },
   takenBadge: {
     flexDirection: 'row',
@@ -93,7 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(52, 211, 153, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.4)',
+    borderColor: colors.successBorder,
   },
   takenBadgeText: {
     fontSize: 11,
@@ -101,8 +156,19 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   meta: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  scheduleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });

@@ -41,9 +41,7 @@ export async function uploadScanImage(uri: string): Promise<ScanResult> {
     } as unknown as Blob);
   }
 
-  const response = await apiClient.post<ScanResult>('/scan/process', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const response = await apiClient.post<ScanResult>('/scan/process', formData);
 
   const data = response?.data ?? {};
   const resolvedName =

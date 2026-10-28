@@ -50,12 +50,11 @@ export function registerUnauthorizedHandler(handler: UnauthorizedHandler | null)
 }
 
 apiClient.interceptors.request.use((config) => {
-  if (
-    typeof window !== 'undefined' &&
-    typeof FormData !== 'undefined' &&
-    config.data instanceof FormData &&
-    config.headers
-  ) {
+  const isFormData =
+    (typeof FormData !== 'undefined' && config.data instanceof FormData) ||
+    (config.data && typeof config.data === 'object' && '_parts' in config.data);
+
+  if (isFormData && config.headers) {
     delete config.headers['Content-Type'];
   }
   return config;

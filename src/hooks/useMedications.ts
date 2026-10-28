@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listMedications } from '@/services/medicationService';
+import { getMedications } from '@/services/medicationService';
 import { subscribeMedicationChanges } from '@/services/medicationEvents';
 import type { Medication } from '@/types';
 
 /**
- * Hook para consultar y refrescar la lista de medicamentos del usuario.
+ * Hook para consultar y refrescar la lista de medicamentos del usuario,
+ * incluyendo su estado de tomas del día (pendiente o tomada).
  */
 export function useMedications() {
   const [medications, setMedications] = useState<Medication[]>([]);
@@ -13,7 +14,7 @@ export function useMedications() {
 
   const fetchMedications = useCallback(async () => {
     try {
-      const data = await listMedications();
+      const data = await getMedications();
       setMedications(Array.isArray(data) ? data : []);
     } catch {
       setMedications([]);

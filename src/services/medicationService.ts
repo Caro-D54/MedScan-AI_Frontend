@@ -1,7 +1,8 @@
 import { apiClient } from './apiClient';
-import { createTreatment, markDoseTaken } from './treatmentService';
+import { createTreatment, getTreatments, markDoseTaken, type TreatmentResponse } from './treatmentService';
 import { clearMedicationTakenState, notifyMedicationChanged } from './medicationEvents';
 import { parseFrequencyToHours } from '@/utils/frequency';
+import { isSameCalendarDay, formatTimeFromIso } from '@/utils/date';
 import type { MedicationDraft } from '@/types/medication';
 import type { DoseRecord, Medication } from '@/types';
 
@@ -47,7 +48,7 @@ export function normalizeMedication(raw?: RawMedicament | null): Medication {
   return result;
 }
 
-export { getMedications, formatNextDoseTime } from './medicaments';
+export { getMedications, formatNextDoseTime, getPendingDoses } from './medicaments';
 
 
 
@@ -91,12 +92,41 @@ export function listMedications(): Promise<Medication[]> {
 }
 
 /**
- * Obtiene el detalle de un medicamento por ID normalizado para la UI.
+ * Obtiene el detalle de un medicamento por ID normalizado para la UI,
+ * enriquecido con el estado de dosis del día de hoy.
  */
-export function getMedication(id: string): Promise<Medication> {
-  return apiClient
-    .get<RawMedicament>(`/medications/${id}`)
-    .then((response) => normalizeMedication(response?.data));
+export async function getMedication(id: string): Promise<Medication> {
+  const [raw, treatments] = await Promise.all([
+    apiClient
+      .get<RawMedicament>(`/medications/${id}`)
+      .then((response) => normalizeMedication(response?.data)),
+    getTreatments(true).catch(() => [] as TreatmentResponse[]),
+  ]);
+
+  const targetTreatment = treatments.find(
+    (t) => String(t.medicationId) === String(id),
+  );
+
+  if (!targetTreatment) {
+    return raw;
+  }
+
+  const todayDoses = (targetTreatment.doses ?? []).filter((d) =>
+    isSameCalendarDay(d.scheduledAt, new Date()),
+  );
+  const pendingToday = todayDoses
+    .filter((d) => d.status === 'PENDING')
+    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+
+  const hasPending = pendingToday.length > 0;
+  const nextPending = pendingToday[0];
+
+  return {
+    ...raw,
+    doseId: nextPending ? String(nextPending.id) : undefined,
+    doseTaken: !hasPending,
+    nextDose: nextPending ? formatTimeFromIso(nextPending.scheduledAt) : undefined,
+  };
 }
 
 /**

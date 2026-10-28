@@ -13,7 +13,7 @@ export async function requestMediaLibraryPermission(): Promise<boolean> {
 export async function pickImageAssetFromLibrary(): Promise<PickedImageAsset | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 1,
+    quality: 0.7,
   });
 
   if (result.canceled || !result.assets?.[0]) {

@@ -148,7 +148,14 @@ export default function MedicationDetailScreen() {
     setFeedback(null);
     const succeeded = await reminder.markTaken();
     if (succeeded) {
-      router.replace('/');
+      setMedication((prev) => (prev ? { ...prev, doseTaken: true } : prev));
+      setFeedback({
+        type: 'success',
+        text: '¡Dosis tomada con éxito! Registrada en tu historial.',
+      });
+      setTimeout(() => {
+        router.replace('/');
+      }, 1200);
       return;
     }
 
@@ -233,6 +240,35 @@ export default function MedicationDetailScreen() {
           <Text style={styles.feedbackText}>{feedback.text}</Text>
         </View>
       ) : null}
+
+      {/* Tarjeta de estado de dosis: ROJO si está pendiente, VERDE si ya fue tomada */}
+      <View
+        style={[
+          styles.doseStatusCard,
+          medication.doseTaken ? styles.doseStatusCardTaken : styles.doseStatusCardPending,
+        ]}
+      >
+        <Ionicons
+          name={medication.doseTaken ? 'checkmark-circle' : 'time'}
+          size={24}
+          color={medication.doseTaken ? colors.success : colors.danger}
+        />
+        <View style={styles.doseStatusInfo}>
+          <Text
+            style={[
+              styles.doseStatusTitle,
+              medication.doseTaken ? styles.doseStatusTitleTaken : styles.doseStatusTitlePending,
+            ]}
+          >
+            {medication.doseTaken ? 'Dosis tomada' : 'Dosis pendiente'}
+          </Text>
+          <Text style={styles.doseStatusSubtitle}>
+            {medication.doseTaken
+              ? 'Este medicamento se encuentra al día.'
+              : `Horario programado: ${medication.nextDose ?? 'Pendiente de toma'}`}
+          </Text>
+        </View>
+      </View>
 
       <View style={styles.detailCard}>
         <DetailRow label="Principio activo" value={medication.activeIngredient ?? ''} />
@@ -378,6 +414,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
     fontWeight: '500',
+  },
+  doseStatusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 16,
+  },
+  doseStatusCardPending: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: colors.dangerBorder,
+  },
+  doseStatusCardTaken: {
+    backgroundColor: 'rgba(52, 211, 153, 0.12)',
+    borderColor: colors.successBorder,
+  },
+  doseStatusInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  doseStatusTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  doseStatusTitlePending: {
+    color: colors.danger,
+  },
+  doseStatusTitleTaken: {
+    color: colors.success,
+  },
+  doseStatusSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   detailCard: {
     borderWidth: 1,
